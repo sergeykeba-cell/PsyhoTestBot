@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Психологічний тест</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    h1, h2 { text-align: center; color: #333; }
+    button { display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+    button.primary { background: #007bff; color: white; }
+    button.secondary { background: #6c757d; color: white; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .options { margin: 20px 0; }
+    .option-btn { background: #e9ecef; margin: 8px 0; }
+    .option-btn.selected { background: #007bff; color: white; }
+    #progress { text-align: center; margin: 20px 0; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Психологічний тест</h1>
+
+    <div id="start">
+      <h2>Оберіть тест</h2>
+      <button class="primary" onclick="startTest('pcl5')">PCL-5 (ПТСР)</button>
+      <button class="primary" onclick="startTest('minmult')">Міні-Мульт</button>
+      <button class="primary" onclick="startTest('schmishek')">Шмішек</button>
+    </div>
+
+    <div id="test" style="display:none;">
+      <h2 id="title"></h2>
+      <p id="question"></p>
+      <div id="options" class="options"></div>
+      <button id="next" class="primary" disabled onclick="nextQuestion()">Наступне</button>
+      <div id="progress">Питання <span id="current">1</span> з <span id="total">20</span></div>
+    </div>
+
+    <div id="result" style="display:none;">
+      <h2>Результати</h2>
+      <p id="resultText"></p>
+      <button class="primary" onclick="downloadPDF()">Завантажити PDF</button>
+      <button class="primary" onclick="sendResult()">Надіслати лікарю</button>
+      <button class="secondary" onclick="restart()">Пройти ще раз</button>
+    </div>
+  </div>
+
+  <script>
+    let current = 0;
+    let answers = [];
+    let testType = '';
+    let name = Telegram.WebApp.initDataUnsafe.user?.first_name + ' ' + Telegram.WebApp.initDataUnsafe.user?.last_name || 'Анонім';
+
+    const tests = {
+      pcl5: {
+        title: "PCL-5 (ПТСР)",
+        questions: [
+          "Повторювані, турбуючі спогади, думки або образи стресової події?",
+          "Повторювані, турбуючі сни про стресову подію?",
+          "Раптові відчуття або дії, ніби стресова подія відбувається знову?",
+          "Сильний емоційний біль при нагадуванні про подію?",
+          "Фізичні реакції (серцебиття, пітливість) при нагадуванні?",
+          "Уникнення думок, почуттів або розмов, пов’язаних з подією?",
+          "Уникнення людей, місць або ситуацій, що нагадують подію?",
+          "Нездатність згадати важливі частини події?",
+          "Сильно негативні переконання про себе, інших або світ?",
+          "Постійне звинувачення себе або інших?",
+          "Негативні емоційні стани (страх, жах, гнів, провина)?",
+          "Втрата інтересу до важливих занять?",
+          "Відчуття відстороненості або відчуженості?",
+          "Нездатність відчувати позитивні емоції?",
+          "Дратівлива поведінка, спалахи гніву?",
+          "Надмірна пильність?",
+          "Надмірна настороженість?",
+          "Легко лякатися?",
+          "Проблеми з концентрацією?",
+          "Проблеми зі сном?"
+        ],
+        options: ["0", "1", "2", "3", "4"],
+        values: [0,1,2,3,4],
+        getSeverity: (s) => s <= 32 ? "мінімальний" : s <= 44 ? "легкий" : s <= 56 ? "помірний" : "важкий"
+      }
+      // Додайте інші тести аналогічно
+    };
+
+    function startTest(type) {
+      testType = type;
+      current = 0;
+      answers = new Array(tests[type].questions.length).fill(null);
+      document.getElementById('start').style.display = 'none';
+      document.getElementById('test').style.display = 'block';
+      document.getElementById('title').textContent = tests[type].title;
+      showQuestion();
+    }
+
+    function showQuestion() {
+      const q = tests[testType].questions[current];
+      document.getElementById('question').textContent = q;
+      document.getElementById('current').textContent = current + 1;
+      document.getElementById('total').textContent = tests[testType].questions.length;
+      document.getElementById('next').disabled = true;
+
+      const opts = document.getElementById('options');
+      opts.innerHTML = '';
+      tests[testType].options.forEach((text, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.textContent = text;
+        btn.onclick = () => select(i);
+        opts.appendChild(btn);
+      });
+    }
+
+    function select(i) {
+      answers[current] = tests[testType].values[i];
+      document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('.option-btn')[i].classList.add('selected');
+      document.getElementById('next').disabled = false;
+    }
+
+    function nextQuestion() {
+      if (answers[current] === null) return;
+      current++;
+      if (current >= tests[testType].questions.length) {
+        showResult();
+      } else {
+        showQuestion();
+      }
+    }
+
+    function showResult() {
+      document.getElementById('test').style.display = 'none';
+      document.getElementById('result').style.display = 'block';
+
+      const score = answers.reduce((a,b)=>a+b,0);
+      const sev = tests[testType].getSeverity(score);
+      document.getElementById('resultText').innerHTML = `
+        Пацієнт: ${name}<br>
+        Тест: ${tests[testType].title}<br>
+        Бали: ${score}<br>
+        Рівень: ${sev}
+      `;
+    }
+
+    function generatePDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFont("DejaVuSans", "normal");
+      doc.setFontSize(16);
+      doc.text(`Тест: ${tests[testType].title}`, 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Пацієнт: ${name}`, 20, 35);
+      doc.text(`Дата: ${new Date().toLocaleDateString('uk-UA')}`, 20, 45);
+      doc.text(`Бали: ${answers.reduce((a,b)=>a+b,0)}`, 20, 55);
+      doc.text(`Рівень: ${tests[testType].getSeverity(answers.reduce((a,b)=>a+b,0))}`, 20, 65);
+      doc.save(`result.pdf`);
+    }
+
+    function sendToDoctor() {
+      const score = answers.reduce((a,b)=>a+b,0);
+      const sev = tests[testType].getSeverity(score);
+      Telegram.WebApp.sendData(JSON.stringify({
+        name: name,
+        test: tests[testType].title,
+        score: score,
+        severity: sev
+      }));
+      Telegram.WebApp.close();
+    }
+
+    function restart() {
+      location.reload();
+    }
+
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+  </script>
+</body>
+</html>
