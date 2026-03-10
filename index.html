@@ -1,41 +1,935 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Психологічний тест</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Психодіагностика</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* ── Reset & Base ───────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:        var(--tg-theme-bg-color, #ffffff);
+  --bg2:       var(--tg-theme-secondary-bg-color, #f4f4f5);
+  --text:      var(--tg-theme-text-color, #18181b);
+  --hint:      var(--tg-theme-hint-color, #71717a);
+  --accent:    var(--tg-theme-button-color, #2563eb);
+  --accent-t:  var(--tg-theme-button-text-color, #ffffff);
+  --link:      var(--tg-theme-link-color, #2563eb);
+  --border:    rgba(0,0,0,0.08);
+  --radius:    14px;
+  --shadow:    0 2px 16px rgba(0,0,0,0.07);
+  --transition: all 0.22s cubic-bezier(.4,0,.2,1);
+}
+
+html, body {
+  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 20px 16px 100px;
+  animation: fadeIn 0.3s ease;
+}
+.screen.active { display: flex; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Loading screen ─────────────────────────────────────── */
+#screen-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text { font-size: 15px; color: var(--hint); }
+
+/* ── Error screen ───────────────────────────────────────── */
+#screen-error {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.error-icon { font-size: 52px; }
+.error-title { font-size: 20px; font-weight: 700; }
+.error-msg { font-size: 15px; color: var(--hint); max-width: 280px; }
+
+/* ── Used screen ────────────────────────────────────────── */
+#screen-used {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+/* ── Intro screen ───────────────────────────────────────── */
+#screen-intro { gap: 0; }
+
+.intro-header {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.intro-emoji { font-size: 48px; margin-bottom: 12px; }
+.intro-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.intro-sub   { font-size: 14px; color: var(--hint); }
+
+.info-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.info-label { font-size: 13px; color: var(--hint); }
+.info-value { font-size: 15px; font-weight: 600; text-align: right; }
+
+.instructions {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  color: var(--hint);
+  text-align: center;
+}
+
+/* ── Test screen ────────────────────────────────────────── */
+#screen-test { gap: 0; }
+
+/* Progress bar */
+.progress-wrap {
+  margin-bottom: 20px;
+}
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--hint);
+  margin-bottom: 8px;
+}
+.progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.35s cubic-bezier(.4,0,.2,1);
+}
+
+/* Question */
+.question-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+}
+
+/* Options */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.option-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg2);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text);
+  text-align: left;
+  transition: var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.option-btn:active { transform: scale(0.98); }
+
+.option-btn.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.option-circle {
+  width: 22px; height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.option-btn.selected .option-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.option-circle::after {
+  content: '';
+  width: 8px; height: 8px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0;
+  transition: var(--transition);
+}
+.option-btn.selected .option-circle::after { opacity: 1; }
+
+/* Navigation */
+.nav-row {
+  display: flex;
+  gap: 10px;
+}
+.btn-back {
+  flex: 0 0 52px;
+  height: 52px;
+  background: var(--bg2);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-back:active { transform: scale(0.96); }
+
+/* ── Primary button ─────────────────────────────────────── */
+.btn-primary {
+  flex: 1;
+  height: 52px;
+  background: var(--accent);
+  color: var(--accent-t);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn-primary:not(:disabled):active { transform: scale(0.98); }
+
+/* ── Result screen ──────────────────────────────────────── */
+#screen-result { gap: 0; }
+
+.result-header {
+  text-align: center;
+  padding: 24px 0 20px;
+}
+.result-emoji { font-size: 56px; margin-bottom: 12px; }
+.result-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.result-sub   { font-size: 14px; color: var(--hint); }
+
+.result-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 18px 18px;
+  margin-bottom: 12px;
+}
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.result-row:last-child { border-bottom: none; }
+.result-row-label { font-size: 14px; color: var(--hint); }
+.result-row-value { font-size: 15px; font-weight: 600; }
+
+.severity-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.sev-low      { background: #dcfce7; color: #16a34a; }
+.sev-moderate { background: #fef9c3; color: #ca8a04; }
+.sev-high     { background: #ffedd5; color: #ea580c; }
+.sev-severe   { background: #fee2e2; color: #dc2626; }
+
+.result-note {
+  font-size: 13px;
+  color: var(--hint);
+  text-align: center;
+  margin: 16px 0 20px;
+  line-height: 1.6;
+}
+
+/* ── Sending screen ─────────────────────────────────────── */
+#screen-sending {
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+/* ── Done screen ─────────────────────────────────────────── */
+#screen-done {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.done-icon  { font-size: 64px; }
+.done-title { font-size: 22px; font-weight: 700; }
+.done-text  { font-size: 15px; color: var(--hint); max-width: 280px; line-height: 1.6; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Психологічний тест</h1>
 
-    <div id="start">
-      <h2>Оберіть тест</h2>
-      <button class="primary" onclick="startTest('pcl5')">PCL-5 (ПТСР)</button>
-      <button class="primary" onclick="startTest('minmult')">Міні-Мульт</button>
-      <button class="primary" onclick="startTest('schmishek')">Шмішек (акцентуації)</button>
+<!-- ── Loading ─────────────────────────────────────────── -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <div class="loading-text">Завантаження тесту…</div>
+</div>
+
+<!-- ── Error ───────────────────────────────────────────── -->
+<div id="screen-error" class="screen">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">Помилка</div>
+  <div class="error-msg" id="errorMsg">Не вдалося завантажити тест.</div>
+</div>
+
+<!-- ── Already used ────────────────────────────────────── -->
+<div id="screen-used" class="screen">
+  <div class="error-icon">🔒</div>
+  <div class="error-title">Тест вже пройдено</div>
+  <div class="error-msg">Це посилання одноразове і вже використане. Зверніться до лікаря для нового посилання.</div>
+</div>
+
+<!-- ── Intro ───────────────────────────────────────────── -->
+<div id="screen-intro" class="screen">
+  <div class="intro-header">
+    <div class="intro-emoji" id="introEmoji">🧠</div>
+    <div class="intro-title" id="introTitle">Завантаження…</div>
+    <div class="intro-sub"  id="introSub"></div>
+  </div>
+
+  <div class="info-card">
+    <div class="info-row">
+      <span class="info-label">👤 Пацієнт</span>
+      <span class="info-value" id="introName">—</span>
     </div>
-
-    <div id="test" style="display:none;">
-      <h2 id="title"></h2>
-      <p id="question"></p>
-      <div id="options" class="options"></div>
-      <button id="next" class="primary" disabled onclick="nextQuestion()">Наступне</button>
-      <div id="progress">Питання <span id="current">1</span> з <span id="total">20</span></div>
+  </div>
+  <div class="info-card">
+    <div class="info-row">
+      <span class="info-label">❓ Кількість питань</span>
+      <span class="info-value" id="introCount">—</span>
     </div>
-
-    <div id="result" style="display:none;">
-      <h2>Результати</h2>
-      <p id="resultText"></p>
-      <button class="primary" onclick="downloadPDF()">Завантажити PDF</button>
-      <button class="primary" onclick="sendToDoctor()">Надіслати лікарю</button>
-      <button class="secondary" onclick="restart()">Пройти ще раз</button>
+    <div style="height:8px"></div>
+    <div class="info-row">
+      <span class="info-label">⏱ Орієнтовний час</span>
+      <span class="info-value" id="introTime">—</span>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <p class="instructions">Відповідайте чесно — результати бачить тільки ваш лікар</p>
+
+  <button class="btn-primary" onclick="startTest()" style="margin-top:auto;">
+    Розпочати тест →
+  </button>
+</div>
+
+<!-- ── Test ────────────────────────────────────────────── -->
+<div id="screen-test" class="screen">
+  <div class="progress-wrap">
+    <div class="progress-info">
+      <span id="progressLabel">Питання 1 з 20</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="question-card" id="questionText"></div>
+
+  <div class="options-list" id="optionsList"></div>
+
+  <div class="nav-row">
+    <button class="btn-back" id="btnBack" onclick="prevQuestion()">←</button>
+    <button class="btn-primary" id="btnNext" onclick="nextQuestion()" disabled>
+      Далі
+    </button>
+  </div>
+</div>
+
+<!-- ── Result ──────────────────────────────────────────── -->
+<div id="screen-result" class="screen">
+  <div class="result-header">
+    <div class="result-emoji" id="resultEmoji">📊</div>
+    <div class="result-title">Тест завершено</div>
+    <div class="result-sub" id="resultSub"></div>
+  </div>
+
+  <div class="result-card">
+    <div class="result-row">
+      <span class="result-row-label">Тест</span>
+      <span class="result-row-value" id="rTestName">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row-label">Пацієнт</span>
+      <span class="result-row-value" id="rPatientName">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row-label">Загальний бал</span>
+      <span class="result-row-value" id="rScore">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row-label">Рівень</span>
+      <span class="result-row-value" id="rSeverity">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row-label">Дата</span>
+      <span class="result-row-value" id="rDate">—</span>
+    </div>
+  </div>
+
+  <p class="result-note">
+    Детальний звіт з інтерпретацією буде надіслано вашому лікарю автоматично після підтвердження.
+  </p>
+
+  <button class="btn-primary" onclick="sendResults()">
+    ✅ Надіслати лікарю
+  </button>
+</div>
+
+<!-- ── Sending ─────────────────────────────────────────── -->
+<div id="screen-sending" class="screen">
+  <div class="spinner"></div>
+  <div class="loading-text">Надсилаємо результати…</div>
+</div>
+
+<!-- ── Done ───────────────────────────────────────────── -->
+<div id="screen-done" class="screen">
+  <div class="done-icon">✅</div>
+  <div class="done-title">Дякуємо!</div>
+  <div class="done-text" id="doneText">
+    Результати надіслано лікарю. Ви отримаєте зворотний зв'язок найближчим часом.
+  </div>
+</div>
+
+<script>
+// ── Telegram WebApp ────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ── Конфігурація тестів ─────────────────────────────────────
+const TESTS = {
+  pcl5: {
+    name:  "PCL-5 (ПТСР)",
+    emoji: "🧠",
+    desc:  "Оцінка симптомів посттравматичного стресового розладу",
+    time:  "5–8 хвилин",
+    options: ["Зовсім ні", "Трохи", "Помірно", "Відчутно", "Дуже"],
+    values:  [0, 1, 2, 3, 4],
+    questions: [
+      "Повторювані, турбуючі спогади, думки або образи стресової події?",
+      "Повторювані, турбуючі сни про стресову подію?",
+      "Раптові відчуття або дії, ніби стресова подія відбувається знову (флешбеки)?",
+      "Сильний емоційний біль при нагадуванні про стресову подію?",
+      "Фізичні реакції (серцебиття, пітливість) при нагадуванні про подію?",
+      "Уникнення думок, почуттів або розмов, пов'язаних зі стресовою подією?",
+      "Уникнення людей, місць або ситуацій, що нагадують про стресову подію?",
+      "Нездатність згадати важливі частини стресової події?",
+      "Сильно негативні переконання про себе, інших або про світ загалом?",
+      "Звинувачення себе або інших у стресовій події або її наслідках?",
+      "Негативні емоційні стани (страх, жах, гнів, провина, сором)?",
+      "Втрата інтересу або участі у важливих заняттях?",
+      "Відчуття відстороненості або відчуженості від оточуючих?",
+      "Нездатність відчувати позитивні емоції (наприклад, нездатність переживати щастя або любов)?",
+      "Дратівлива поведінка, спалахи гніву або агресивні дії?",
+      "Ризикована або деструктивна поведінка?",
+      "Підвищена пильність або настороженість?",
+      "Підвищена реакція переляку (легко лякатися)?",
+      "Труднощі з концентрацією уваги?",
+      "Порушення сну (труднощі із засинанням або неспокійний сон)?"
+    ],
+    getSeverity(s) {
+      if (s <= 32) return { key: "low",      label: "Мінімальний",  cls: "sev-low" };
+      if (s <= 44) return { key: "moderate", label: "Легкий",       cls: "sev-moderate" };
+      if (s <= 56) return { key: "high",     label: "Помірний",     cls: "sev-high" };
+      return              { key: "severe",   label: "Важкий",       cls: "sev-severe" };
+    }
+  },
+
+  minmult: {
+    name:  "Міні-Мульт (скор. MMPI)",
+    emoji: "📋",
+    desc:  "Скорочена версія багатоаспектного особистісного опитувальника",
+    time:  "10–15 хвилин",
+    options: ["Так", "Ні"],
+    values:  [1, 0],
+    questions: [
+      "У мене бувають періоди, коли мені дуже хочеться щось зробити, але я не знаю, що саме.",
+      "У мене часто болить голова.",
+      "Раз на тиждень або частіше я без видимої причини відчуваю жар у всьому тілі.",
+      "Часом мені хочеться лаятися.",
+      "У мене бувають періоди тривалістю кілька днів або тижнів, коли я відчуваю себе незвично бадьорим.",
+      "Мій зір став гіршим, ніж був раніше.",
+      "Іноді у мене бувають напади сміху або плачу, які я не можу стримати.",
+      "Мені здається, що мене ніхто не розуміє.",
+      "Буває, що я говорю про речі, на яких не знаюся.",
+      "Я вважаю, що мене часто карають незаслужено.",
+      "Більшу частину часу мені нудно і мене нічого не радує.",
+      "Я впевнений, що до мене ставляться гірше, ніж до інших.",
+      "Буває, що мені спадають на думку такі нехороші думки, що краще про них нікому не говорити.",
+      "Часом я відчуваю, що мені загрожує небезпека.",
+      "Більшість людей чесні лише тому, що бояться покарання.",
+      "Часом мої думки йдуть так швидко, що я не встигаю їх висловити.",
+      "Я вважаю, що моє сімейне життя таке ж добре, як у більшості людей.",
+      "Я переконаний, що моє майбутнє більш безнадійне, ніж у більшості людей.",
+      "Мені важко зосередитися на якомусь завданні або роботі.",
+      "У мене бувають дивні та незвичайні переживання.",
+      "Іноді я відчуваю, що мені важко дихати, хоча я не роблю ніякої важкої роботи.",
+      "Більшу частину часу я відчуваю загальну слабкість.",
+      "У мене бувають приступи, під час яких я роблю або говорю щось таке, в чому потім розкаююся.",
+      "Я відчуваю, що моє становище безнадійне.",
+      "Я нерідко відчуваю незрозумілий страх або тривогу.",
+      "Мені легко змусити людей боятися мене, і іноді я це роблю заради забави.",
+      "У моєму житті були випадки, коли мене примушували займатися сексом.",
+      "Деякий час я не міг нормально функціонувати через нервовий зрив.",
+      "У мене бувають короткочасні, але дуже гострі напади нудоти або блювоти.",
+      "Я думаю, що більшість людей стали б брехати, аби уникнути неприємностей.",
+      "Моє здоров'я таке ж хороше, як і в більшості моїх знайомих.",
+      "Мені нерідко хочеться завдати собі фізичної шкоди.",
+      "У мене бувають труднощі з ковтанням.",
+      "Більшу частину часу я відчуваю, що зробив щось не так або зле.",
+      "Іноді я відчуваю себе непотрібним і нікому не цікавим.",
+      "Я дуже рідко бачу яскраві сни.",
+      "Кілька разів на тиждень у мене бувають відчуття, що має статись щось страшне.",
+      "Я думаю, що мене переслідує нещастя.",
+      "Я відчуваю тривогу і неспокій тоді, коли думаю про мої справи і турботи.",
+      "Часто у мене бувають посмикування в м'язах.",
+      "Мені важко підтримувати розмову з незнайомими людьми.",
+      "Більшу частину часу мені здається, що я зробив щось погане або шкідливе.",
+      "Іноді я відчуваю, що я є кращим і важливішим, ніж інші.",
+      "Я знаю, хто несе відповідальність за більшість моїх неприємностей.",
+      "У мене бувають слухові галюцинації.",
+      "Я з легкістю можу розплакатися.",
+      "Часто я відчуваю себе зігнутим або скутим у всьому тілі.",
+      "Іноді у мене бувають думки, яких я соромлюся.",
+      "Я часто замислююся про те, що я зробив щось погане або шкідливе.",
+      "Я думаю, що більшість людей здатні збрехати задля особистої вигоди.",
+      "Голова у мене болить рідко.",
+      "Мені важко концентруватись на тому, що я роблю.",
+      "У мене є погані звички, від яких важко позбутися.",
+      "Незнайомі люди викликають у мене острах.",
+      "Мені важко зрозуміти те, що я читаю.",
+      "Мені здається, що мені ніколи не буде добре.",
+      "Мене хвилює, що мені не вдається зосередитись.",
+      "Я вважаю себе нервовою людиною.",
+      "Деякі думки турбують мене навіть тоді, коли я намагаюся від них позбутися.",
+      "Я дуже рідко замислююсь про своє здоров'я.",
+      "Мені важко залишатись спокійним, коли я відчуваю стрес.",
+      "У мене майже ніколи не буває болю в серці або в грудях.",
+      "Моє сімейне становище задовільне.",
+      "Я рідко відчуваю тривогу через своє здоров'я.",
+      "Я відчуваю себе самотнім більшість часу.",
+      "Іноді мені здається, що мені важко дихати.",
+      "Більшість часу я відчуваю втому і зниження сил.",
+      "Мене хвилює моя поведінка під впливом алкоголю.",
+      "Часом я відчуваю, що мені потрібна допомога.",
+      "Я схильний вважати себе невдахою."
+    ],
+    getSeverity(s) {
+      if (s <= 23) return { key: "low",      label: "В нормі",      cls: "sev-low" };
+      if (s <= 35) return { key: "moderate", label: "Субнорма",     cls: "sev-moderate" };
+      if (s <= 46) return { key: "high",     label: "Відхилення",   cls: "sev-high" };
+      return              { key: "severe",   label: "Виражений",    cls: "sev-severe" };
+    }
+  },
+
+  schmishek: {
+    name:  "Шмішек (акцентуації)",
+    emoji: "🔍",
+    desc:  "Діагностика акцентуацій характеру за Леонгардом-Шмішеком",
+    time:  "8–12 хвилин",
+    options: ["Так", "Ні"],
+    values:  [1, 0],
+    questions: [
+      "Чи ви зазвичай спокійні та врівноважені?",
+      "Чи швидко ви забуваєте образи?",
+      "Чи буває у вас часто безпричинна зміна настрою?",
+      "Чи прагнете ви бути лідером у будь-якій ситуації?",
+      "Чи часто ви відчуваєте страх у темряві або на самоті?",
+      "Чи завжди ви дотримуєтесь черги в магазині чи транспорті?",
+      "Чи часто ви відчуваєте приплив енергії та бадьорості?",
+      "Чи часто вам кажуть, що ви занадто самовпевнені?",
+      "Чи схильні ви уникати конфліктів?",
+      "Чи легко вас вивести з рівноваги?",
+      "Чи відчуваєте ви надмірну стурбованість через дрібниці?",
+      "Чи часто ви відчуваєте внутрішній неспокій без видимих причин?",
+      "Чи схильні ви детально планувати свої дії?",
+      "Чи легко ви знайомитесь з новими людьми?",
+      "Чи часто ви відчуваєте пригніченість або смуток?",
+      "Чи часто у вас бувають перепади настрою (від ейфорії до депресії)?",
+      "Чи прагнете ви до ідеальності у будь-якій справі?",
+      "Чи любите ви бути в центрі уваги?",
+      "Чи схильні ви до частої зміни інтересів і захоплень?",
+      "Чи часто ви відчуваєте, що вас не розуміють оточуючі?",
+      "Чи довго ви пам'ятаєте образи?",
+      "Чи вам важко відмовити, коли вас про щось просять?",
+      "Чи вважаєте ви себе людиною з підвищеним почуттям відповідальності?",
+      "Чи часто ви буваєте надмірно балакучими?",
+      "Чи схильні ви до самоаналізу та роздумів про себе?",
+      "Чи часто ви відчуваєте тривогу перед майбутніми подіями?",
+      "Чи легко вас переконати змінити думку?",
+      "Чи часто ви піднімаєте настрій оточуючим своїми жартами?",
+      "Чи схильні ви до педантизму і надмірної ретельності?",
+      "Чи часто ви відчуваєте потребу в усамітненні?",
+      "Чи буває, що ви гостро реагуєте на критику?",
+      "Чи схильні ви до ризикованих дій або авантюр?",
+      "Чи часто ви відчуваєте роздратування без явних причин?",
+      "Чи прагнете ви завжди дотримуватись встановлених правил?",
+      "Чи буває, що у вас виникають нав'язливі думки або образи?",
+      "Чи часто ви відчуваєте підйом сил та натхнення?",
+      "Чи схильні ви бурхливо виражати свої емоції?",
+      "Чи часто ви відчуваєте невпевненість у власних силах?",
+      "Чи важко вам довго зосереджуватись на одному занятті?",
+      "Чи часто у вас виникає бажання зробити щось незвичне або екстравагантне?",
+      "Чи прагнете ви завжди виконувати свої обіцянки?",
+      "Чи буває, що через погані думки вам важко заснути?",
+      "Чи часто ви відчуваєте, що вам не вистачає часу?",
+      "Чи часто ви переживаєте за здоров'я своїх близьких?",
+      "Чи схильні ви аналізувати свої вчинки після їх здійснення?",
+      "Чи часто ви відчуваєте емоційне виснаження?",
+      "Чи буває, що ви підпорядковуєте свої бажання волі інших?",
+      "Чи легко вам переключитись з одного виду діяльності на інший?",
+      "Чи часто вам кажуть, що ви занадто серйозні?",
+      "Чи часто ви беретесь одночасно за кілька справ?",
+      "Чи схильні ви уникати відповідальних рішень?",
+      "Чи часто вам важко чекати або терпіти затримки?",
+      "Чи буває, що ви говорите неправду заради того, щоб уникнути конфлікту?",
+      "Чи часто ви відчуваєте страх зробити щось не так?",
+      "Чи схильні ви сильно переживати невдачі?",
+      "Чи часто ви відчуваєте надмірну збудженість або нервозність?",
+      "Чи часто у вас виникають незвичайні або оригінальні ідеї?",
+      "Чи схильні ви зберігати спокій у надзвичайних ситуаціях?",
+      "Чи часто вам хочеться різко змінити своє оточення або умови життя?",
+      "Чи схильні ви покладатися на інших у важких ситуаціях?",
+      "Чи часто ви відчуваєте потребу у схваленні з боку оточуючих?",
+      "Чи легко вам змиритися зі втратою або невдачею?",
+      "Чи часто у вас бувають напади смутку або тривоги без видимих причин?",
+      "Чи часто ви відчуваєте, що є обраним або особливим?",
+      "Чи схильні ви ретельно обмірковувати рішення перед їх прийняттям?",
+      "Чи часто ви відчуваєте надмірну втому від спілкування з людьми?",
+      "Чи буває, що ви поводитесь надто імпульсивно і потім шкодуєте про це?",
+      "Чи важко вам зберігати таємницю?",
+      "Чи схильні ви сильно переживати через критику на свою адресу?",
+      "Чи часто ви відчуваєте, що ситуація виходить з-під вашого контролю?",
+      "Чи часто у вас виникає бажання звернутися за підтримкою до інших?",
+      "Чи схильні ви до надмірної самокритики?",
+      "Чи буває, що ви відчуваєте ейфорію або надмірну радість без особливих причин?",
+      "Чи часто ви ставите власні потреби нижче потреб інших?",
+      "Чи схильні ви виявляти агресію у відповідь на несправедливість?",
+      "Чи часто ви відчуваєте нудьгу навіть під час активної діяльності?",
+      "Чи буває, що ви відчуваєте надмірну жалість до себе?",
+      "Чи часто ви відчуваєте потребу в нових враженнях або пригодах?",
+      "Чи схильні ви до надмірного контролю над собою та своїми емоціями?",
+      "Чи часто ви відчуваєте, що ваша поведінка відрізняється від поведінки більшості людей?",
+      "Чи часто ви відчуваєте, що не можете зупинитись, навіть коли втомились?",
+      "Чи буває, що ви підозрюєте людей у прихованих мотивах?",
+      "Чи часто ви відчуваєте надмірне збудження або тривогу перед важливими подіями?",
+      "Чи схильні ви до пошуку нових форм самовираження?"
+    ],
+    getSeverity(s) {
+      if (s <= 28) return { key: "low",      label: "В нормі",         cls: "sev-low" };
+      if (s <= 45) return { key: "moderate", label: "Акцентуація",     cls: "sev-moderate" };
+      if (s <= 62) return { key: "high",     label: "Виражена",        cls: "sev-high" };
+      return              { key: "severe",   label: "Дуже виражена",   cls: "sev-severe" };
+    }
+  }
+};
+
+// ── Стан ─────────────────────────────────────────────────────
+let state = {
+  sessionToken: null,
+  sessionData:  null,   // { patient_name, test_type, test_version }
+  current:      0,
+  answers:      [],
+  score:        0,
+  severity:     null,
+};
+
+// ── Утиліти ──────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  show('screen-error');
+}
+
+// ── Зчитування session_token з URL ───────────────────────────
+function getSessionToken() {
+  // Варіант 1: ?token=UUID (пряме посилання)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('token')) return urlParams.get('token');
+
+  // Варіант 2: Telegram startapp параметр
+  // URL виглядає як: https://t.me/Bot/app?startapp=TOKEN
+  // Telegram передає його через tg.initDataUnsafe.start_param
+  const startParam = tg?.initDataUnsafe?.start_param;
+  if (startParam) return startParam;
+
+  // Варіант 3: хеш #TOKEN
+  if (window.location.hash) return window.location.hash.slice(1);
+
+  return null;
+}
+
+// ── Завантаження сесії з n8n ─────────────────────────────────
+// n8n має endpoint GET /webhook/session?token=UUID
+// який повертає { patient_name, test_type, test_version, status }
+async function loadSession(token) {
+  // URL n8n вебхуку для отримання даних сесії
+  // Замініть на ваш реальний URL
+  const N8N_SESSION_URL = 'https://your-n8n.domain.com/webhook/session';
+
+  const resp = await fetch(`${N8N_SESSION_URL}?token=${token}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+// ── Відправка результатів ─────────────────────────────────────
+const N8N_SUBMIT_URL = 'https://your-n8n.domain.com/webhook/psychotest';
+
+async function submitResults(payload) {
+  const resp = await fetch(N8N_SUBMIT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+// ── Ініціалізація ─────────────────────────────────────────────
+async function init() {
+  show('screen-loading');
+
+  const token = getSessionToken();
+  if (!token) {
+    showError('Посилання недійсне або пошкоджене. Зверніться до лікаря.');
+    return;
+  }
+  state.sessionToken = token;
+
+  try {
+    const data = await loadSession(token);
+
+    // Перевірка статусу
+    if (data.status === 'completed') { show('screen-used'); return; }
+    if (data.status === 'expired')   { showError('Термін дії посилання минув. Зверніться до лікаря.'); return; }
+
+    // Перевірка типу тесту
+    if (!TESTS[data.test_type]) {
+      showError(`Невідомий тип тесту: ${data.test_type}`);
+      return;
+    }
+
+    state.sessionData = data;
+    state.answers = new Array(TESTS[data.test_type].questions.length).fill(null);
+
+    // Заповнення інтро
+    const test = TESTS[data.test_type];
+    document.getElementById('introEmoji').textContent  = test.emoji;
+    document.getElementById('introTitle').textContent  = test.name;
+    document.getElementById('introSub').textContent    = test.desc;
+    document.getElementById('introName').textContent   = data.patient_name;
+    document.getElementById('introCount').textContent  = `${test.questions.length} питань`;
+    document.getElementById('introTime').textContent   = test.time;
+
+    show('screen-intro');
+
+  } catch (err) {
+    console.error('loadSession error:', err);
+    showError('Не вдалося завантажити тест. Перевірте з'єднання і спробуйте ще раз.');
+  }
+}
+
+// ── Старт тесту ───────────────────────────────────────────────
+function startTest() {
+  state.current = 0;
+  renderQuestion();
+  show('screen-test');
+}
+
+// ── Рендер питання ────────────────────────────────────────────
+function renderQuestion() {
+  const { test_type } = state.sessionData;
+  const test = TESTS[test_type];
+  const total = test.questions.length;
+  const i = state.current;
+  const pct = Math.round((i / total) * 100);
+
+  document.getElementById('progressLabel').textContent = `Питання ${i + 1} з ${total}`;
+  document.getElementById('progressPct').textContent   = `${pct}%`;
+  document.getElementById('progressFill').style.width  = `${pct}%`;
+  document.getElementById('questionText').textContent  = test.questions[i];
+
+  // Кнопка "назад" — скрити на першому питанні
+  document.getElementById('btnBack').style.visibility = i === 0 ? 'hidden' : 'visible';
+
+  // Кнопка "далі" — "Завершити" на останньому
+  const btnNext = document.getElementById('btnNext');
+  btnNext.textContent = (i === total - 1) ? '✅ Завершити' : 'Далі';
+  btnNext.disabled = (state.answers[i] === null);
+
+  // Опції
+  const list = document.getElementById('optionsList');
+  list.innerHTML = '';
+  test.options.forEach((label, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn' + (state.answers[i] === test.values[idx] ? ' selected' : '');
+    btn.innerHTML = `<div class="option-circle"></div><span>${label}</span>`;
+    btn.onclick = () => selectOption(idx);
+    list.appendChild(btn);
+  });
+}
+
+function selectOption(idx) {
+  const { test_type } = state.sessionData;
+  const test = TESTS[test_type];
+  state.answers[state.current] = test.values[idx];
+  renderQuestion();
+  document.getElementById('btnNext').disabled = false;
+}
+
+function prevQuestion() {
+  if (state.current > 0) { state.current--; renderQuestion(); }
+}
+
+function nextQuestion() {
+  const { test_type } = state.sessionData;
+  const total = TESTS[test_type].questions.length;
+
+  if (state.answers[state.current] === null) return;
+
+  if (state.current < total - 1) {
+    state.current++;
+    renderQuestion();
+  } else {
+    showResult();
+  }
+}
+
+// ── Результат ─────────────────────────────────────────────────
+function showResult() {
+  const { test_type, patient_name } = state.sessionData;
+  const test = TESTS[test_type];
+
+  state.score    = state.answers.reduce((a, b) => a + (b || 0), 0);
+  state.severity = test.getSeverity(state.score);
+
+  document.getElementById('resultEmoji').textContent   = test.emoji;
+  document.getElementById('resultSub').textContent     = patient_name;
+  document.getElementById('rTestName').textContent     = test.name;
+  document.getElementById('rPatientName').textContent  = patient_name;
+  document.getElementById('rScore').textContent        = state.score;
+  document.getElementById('rDate').textContent         = new Date().toLocaleDateString('uk-UA');
+
+  const sevEl = document.getElementById('rSeverity');
+  sevEl.innerHTML = `<span class="severity-badge ${state.severity.cls}">${state.severity.label}</span>`;
+
+  show('screen-result');
+}
+
+// ── Надсилання ────────────────────────────────────────────────
+async function sendResults() {
+  show('screen-sending');
+
+  const { test_type, test_version, patient_name } = state.sessionData;
+
+  const payload = {
+    submission_id:  crypto.randomUUID(),
+    session_token:  state.sessionToken,
+    test_type,
+    test_version:   test_version || '1.0',
+    patient_name,
+    score:          state.score,
+    severity:       state.severity.key,
+    answers:        state.answers,
+    timestamp:      Date.now(),
+    // Telegram user info якщо доступно
+    telegram_id:    tg?.initDataUnsafe?.user?.id || null,
+  };
+
+  try {
+    await submitResults(payload);
+    document.getElementById('doneText').textContent =
+      `Результати надіслано лікарю. Очікуйте на зв'язок найближчим часом.`;
+    show('screen-done');
+
+    // Закрити Mini App через 3 секунди
+    setTimeout(() => tg?.close(), 3000);
+
+  } catch (err) {
+    console.error('submitResults error:', err);
+    // Показуємо результат але пропонуємо спробувати ще раз
+    show('screen-result');
+    alert('Не вдалося надіслати. Перевірте з'єднання і спробуйте ще раз.');
+  }
+}
+
+// ── Старт ─────────────────────────────────────────────────────
+init();
+</script>
 </body>
 </html>
