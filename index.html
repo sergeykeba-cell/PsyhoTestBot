@@ -762,6 +762,7 @@ async function submitResults(payload) {
 
 // ── Ініціалізація ─────────────────────────────────────────────
 async function init() {
+  if (tg) tg.enableClosingConfirmation();
   show('screen-loading');
 
   const token = getSessionToken();
