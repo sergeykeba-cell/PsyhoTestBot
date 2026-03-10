@@ -82,9 +82,9 @@ html, body {
   -webkit-tap-highlight-color:transparent;
 }
 .option-btn:active { transform:scale(0.98); }
+/* [BUG FIX] color-mix() → rgba() для підтримки старих WebView */
 .option-btn.selected {
   border-color:var(--accent);
-  /* FIX: replaced color-mix() with rgba for broader compatibility */
   background: rgba(37, 99, 235, 0.10);
   color:var(--accent); font-weight:600;
 }
@@ -101,6 +101,7 @@ html, body {
 }
 .option-btn.selected .option-circle::after { opacity:1; }
 .nav-row { display:flex; gap:10px; }
+/* [BUG FIX] disabled замість visibility:hidden — прибирає ghost-кліки */
 .btn-back {
   flex:0 0 52px; height:52px; background:var(--bg2); border:none;
   border-radius:var(--radius); cursor:pointer; font-size:20px;
@@ -108,7 +109,7 @@ html, body {
   transition:var(--transition); -webkit-tap-highlight-color:transparent;
 }
 .btn-back:active { transform:scale(0.96); }
-.btn-back[disabled] { opacity:0; pointer-events:none; }
+.btn-back:disabled { opacity:0; pointer-events:none; }
 .btn-primary {
   flex:1; height:52px; background:var(--accent); color:var(--accent-t);
   border:none; border-radius:var(--radius); font-size:16px; font-weight:600;
@@ -157,6 +158,10 @@ html, body {
   <div class="error-msg">Це посилання одноразове і вже використане. Зверніться до лікаря для нового посилання.</div>
 </div>
 
+<!--
+  Екран вступу: тест і пацієнт визначаються ТІЛЬКИ з токена сесії,
+  який бот створив при /newtest. Вибір тесту в Mini App відсутній.
+-->
 <div id="screen-intro" class="screen">
   <div class="intro-header">
     <div class="intro-emoji" id="introEmoji">&#129504;</div>
@@ -199,7 +204,6 @@ html, body {
   <div class="question-card" id="questionText"></div>
   <div class="options-list"  id="optionsList"></div>
   <div class="nav-row">
-    <!-- FIX: use disabled attribute instead of visibility for proper UX -->
     <button class="btn-back" id="btnBack" onclick="prevQuestion()">&#8592;</button>
     <button class="btn-primary" id="btnNext" onclick="nextQuestion()" disabled>Далі</button>
   </div>
@@ -257,15 +261,19 @@ html, body {
 <script>
 // ── Telegram WebApp ───────────────────────────────────────
 const tg = window.Telegram && window.Telegram.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+// [BUG FIX] tg.ready/expand/enableClosingConfirmation — тільки після перевірки
+if (tg) { tg.ready(); tg.expand(); tg.enableClosingConfirmation(); }
 
 // ── URLs ──────────────────────────────────────────────────
-// FIX: changed http:// → https:// to prevent mixed-content blocking in browsers/Telegram
+// [CRITICAL FIX] http → https, інакше браузер / Telegram блокує запити
 const N8N_SESSION_URL = 'https://78.47.110.193:5678/webhook/session';
 const N8N_SUBMIT_URL  = 'https://78.47.110.193:5678/webhook/psychotest';
 
 // ── Тести ─────────────────────────────────────────────────
-const TESTS = {
+// Вибір тесту відбувається в боті (/newtest).
+// Mini App отримує test_type через токен сесії з n8n.
+// Всі три варіанти описані тут лише для рендерингу питань і підрахунку балів.
+var TESTS = {
   pcl5: {
     name: "PCL-5 (ПТСР)", emoji: "&#129504;",
     desc: "Оцінка симптомів посттравматичного стресового розладу",
@@ -509,19 +517,19 @@ function showError(msg) {
   show('screen-error');
 }
 
-// FIX: fallback for crypto.randomUUID() in old WebViews
+// [BUG FIX] Полифіл crypto.randomUUID() для старих WebView
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     var r = Math.random() * 16 | 0;
-    var v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
 
 // ── Зчитування токена ────────────────────────────────────
+// Пріоритет: ?token= → Telegram startParam → #hash
 function getSessionToken() {
   var urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('token')) return urlParams.get('token');
@@ -531,9 +539,27 @@ function getSessionToken() {
   return null;
 }
 
+// ── Preview-режим: ?preview=pcl5|minmult|schmishek ───────
+// Дозволяє переглянути тест без токена і без n8n (тільки для розробки)
+function getPreviewType() {
+  return new URLSearchParams(window.location.search).get('preview');
+}
+
+function initPreview(testType) {
+  if (!TESTS[testType]) {
+    showError('Невідомий тип тесту: ' + testType + '. Доступні: pcl5, minmult, schmishek');
+    return;
+  }
+  state.sessionToken = 'preview';
+  state.sessionData  = { test_type: testType, test_version: '1.0', patient_name: '[ Preview ]' };
+  state.answers = new Array(TESTS[testType].questions.length).fill(null);
+  renderIntro();
+  show('screen-intro');
+}
+
 // ── Завантаження сесії ───────────────────────────────────
 async function loadSession(token) {
-  var resp = await fetch(N8N_SESSION_URL + '?token=' + token, {
+  var resp = await fetch(N8N_SESSION_URL + '?token=' + encodeURIComponent(token), {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' }
   });
@@ -541,52 +567,26 @@ async function loadSession(token) {
   return await resp.json();
 }
 
-// ── Preview mode (bypass session) ────────────────────────
-// Usage: open HTML with ?preview=pcl5  OR  ?preview=minmult  OR  ?preview=schmishek
-function getPreviewType() {
-  var urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('preview') || null;
-}
-
-function initPreview(testType) {
-  if (!TESTS[testType]) {
-    showError('Невідомий тип тесту для preview: ' + testType + '. Доступні: pcl5, minmult, schmishek');
-    return;
-  }
-  state.sessionToken = 'preview';
-  state.sessionData  = {
-    test_type:    testType,
-    test_version: '1.0',
-    patient_name: '[ Preview / Тест ]'
-  };
-  state.answers = new Array(TESTS[testType].questions.length).fill(null);
-
-  var test = TESTS[testType];
+// ── Рендер intro-екрану ───────────────────────────────────
+function renderIntro() {
+  var test = TESTS[state.sessionData.test_type];
   document.getElementById('introEmoji').innerHTML   = test.emoji;
   document.getElementById('introTitle').textContent = test.name;
-  document.getElementById('introSub').textContent   = test.desc + ' — ⚠️ PREVIEW';
+  document.getElementById('introSub').textContent   = test.desc;
   document.getElementById('introName').textContent  = state.sessionData.patient_name;
   document.getElementById('introCount').textContent = test.questions.length + ' питань';
   document.getElementById('introTime').textContent  = test.time;
-
-  show('screen-intro');
 }
 
 // ── Ініціалізація ─────────────────────────────────────────
 async function init() {
-  // FIX: guard tg calls — only call if tg is available
-  if (tg) {
-    tg.enableClosingConfirmation();
-  }
   show('screen-loading');
 
-  // ── Preview mode: ?preview=pcl5 — skip n8n entirely ──
+  // Preview-режим: ?preview=pcl5
   var previewType = getPreviewType();
-  if (previewType) {
-    initPreview(previewType);
-    return;
-  }
+  if (previewType) { initPreview(previewType); return; }
 
+  // Звичайний режим: токен від бота через QR/посилання
   var token = getSessionToken();
   if (!token) {
     showError('Посилання недійсне або пошкоджене. Зверніться до лікаря.');
@@ -596,6 +596,7 @@ async function init() {
 
   try {
     var data = await loadSession(token);
+
     if (data.status === 'completed') { show('screen-used'); return; }
     if (data.status === 'expired')   { showError('Термін дії посилання минув.'); return; }
     if (!TESTS[data.test_type])      { showError('Невідомий тип тесту: ' + data.test_type); return; }
@@ -603,14 +604,7 @@ async function init() {
     state.sessionData = data;
     state.answers = new Array(TESTS[data.test_type].questions.length).fill(null);
 
-    var test = TESTS[data.test_type];
-    document.getElementById('introEmoji').innerHTML  = test.emoji;
-    document.getElementById('introTitle').textContent = test.name;
-    document.getElementById('introSub').textContent   = test.desc;
-    document.getElementById('introName').textContent  = data.patient_name;
-    document.getElementById('introCount').textContent = test.questions.length + ' питань';
-    document.getElementById('introTime').textContent  = test.time;
-
+    renderIntro();
     show('screen-intro');
   } catch(err) {
     console.error('loadSession error:', err);
@@ -631,25 +625,24 @@ function renderQuestion() {
   var i     = state.current;
   var pct   = Math.round((i / total) * 100);
 
-  document.getElementById('progressLabel').textContent = 'Питання ' + (i+1) + ' з ' + total;
+  document.getElementById('progressLabel').textContent = 'Питання ' + (i + 1) + ' з ' + total;
   document.getElementById('progressPct').textContent   = pct + '%';
   document.getElementById('progressFill').style.width  = pct + '%';
   document.getElementById('questionText').textContent  = test.questions[i];
 
-  // FIX: use disabled attribute instead of visibility to prevent ghost clicks
-  var btnBack = document.getElementById('btnBack');
-  btnBack.disabled = (i === 0);
+  // [BUG FIX] disabled замість visibility:hidden — усуває ghost-кліки на першому питанні
+  document.getElementById('btnBack').disabled = (i === 0);
 
   var btnNext = document.getElementById('btnNext');
-  // FIX: set textContent only (no innerHTML needed), preserve button text correctly
   btnNext.textContent = (i === total - 1) ? 'Завершити' : 'Далі';
   btnNext.disabled    = (state.answers[i] === null);
 
   var list = document.getElementById('optionsList');
   list.innerHTML = '';
   test.options.forEach(function(label, idx) {
+    var isSelected = state.answers[i] === test.values[idx];
     var btn = document.createElement('button');
-    btn.className = 'option-btn' + (state.answers[i] === test.values[idx] ? ' selected' : '');
+    btn.className = 'option-btn' + (isSelected ? ' selected' : '');
     btn.innerHTML = '<div class="option-circle"></div><span>' + label + '</span>';
     btn.onclick = function() { selectOption(idx); };
     list.appendChild(btn);
@@ -660,7 +653,6 @@ function selectOption(idx) {
   var test = TESTS[state.sessionData.test_type];
   state.answers[state.current] = test.values[idx];
   renderQuestion();
-  document.getElementById('btnNext').disabled = false;
   if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
 }
 
@@ -682,8 +674,10 @@ function nextQuestion() {
 // ── Результат ────────────────────────────────────────────
 function showResult() {
   var test = TESTS[state.sessionData.test_type];
-  // FIX: filter out nulls explicitly before summing
-  state.score    = state.answers.reduce(function(a, b) { return a + (b !== null ? b : 0); }, 0);
+  // [BUG FIX] явна перевірка null — відрізняє "не відповів" від валідного 0
+  state.score = state.answers.reduce(function(acc, val) {
+    return acc + (val !== null ? val : 0);
+  }, 0);
   state.severity = test.getSeverity(state.score);
 
   document.getElementById('resultEmoji').innerHTML    = test.emoji;
@@ -701,17 +695,18 @@ function showResult() {
 
 // ── Надсилання ───────────────────────────────────────────
 async function sendResults() {
-  // Preview mode — do not send to n8n
+  // Preview-режим — не надсилаємо
   if (state.sessionToken === 'preview') {
     document.getElementById('doneText').textContent =
-      '⚠️ Preview-режим: результати не надсилаються. Бал: ' + state.score + ' — ' + state.severity.label;
+      '⚠️ Preview-режим. Результати не надсилаються. Бал: ' + state.score + ' — ' + state.severity.label;
     show('screen-done');
     return;
   }
+
   show('screen-sending');
 
   var payload = {
-    submission_id: generateUUID(), // FIX: use polyfilled version
+    submission_id: generateUUID(),        // [BUG FIX] полифіл замість crypto.randomUUID()
     session_token: state.sessionToken,
     test_type:     state.sessionData.test_type,
     test_version:  state.sessionData.test_version || '1.0',
@@ -720,7 +715,8 @@ async function sendResults() {
     severity:      state.severity.key,
     answers:       state.answers,
     timestamp:     Date.now(),
-    telegram_id:   tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null
+    telegram_id:   tg && tg.initDataUnsafe && tg.initDataUnsafe.user
+                     ? tg.initDataUnsafe.user.id : null
   };
 
   try {
