@@ -736,7 +736,7 @@ function getSessionToken() {
 async function loadSession(token) {
   // URL n8n вебхуку для отримання даних сесії
   // Замініть на ваш реальний URL
-  const N8N_SESSION_URL = 'https://your-n8n.domain.com/webhook/session';
+  const N8N_SESSION_URL = 'http://78.47.110.193/webhook/session';
 
   const resp = await fetch(`${N8N_SESSION_URL}?token=${token}`, {
     method: 'GET',
