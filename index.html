@@ -84,7 +84,8 @@ html, body {
 .option-btn:active { transform:scale(0.98); }
 .option-btn.selected {
   border-color:var(--accent);
-  background:color-mix(in srgb, var(--accent) 10%, var(--bg));
+  /* FIX: replaced color-mix() with rgba for broader compatibility */
+  background: rgba(37, 99, 235, 0.10);
   color:var(--accent); font-weight:600;
 }
 .option-circle {
@@ -107,6 +108,7 @@ html, body {
   transition:var(--transition); -webkit-tap-highlight-color:transparent;
 }
 .btn-back:active { transform:scale(0.96); }
+.btn-back[disabled] { opacity:0; pointer-events:none; }
 .btn-primary {
   flex:1; height:52px; background:var(--accent); color:var(--accent-t);
   border:none; border-radius:var(--radius); font-size:16px; font-weight:600;
@@ -197,6 +199,7 @@ html, body {
   <div class="question-card" id="questionText"></div>
   <div class="options-list"  id="optionsList"></div>
   <div class="nav-row">
+    <!-- FIX: use disabled attribute instead of visibility for proper UX -->
     <button class="btn-back" id="btnBack" onclick="prevQuestion()">&#8592;</button>
     <button class="btn-primary" id="btnNext" onclick="nextQuestion()" disabled>Далі</button>
   </div>
@@ -257,8 +260,9 @@ const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 // ── URLs ──────────────────────────────────────────────────
-const N8N_SESSION_URL = 'http://78.47.110.193:5678/webhook/session';
-const N8N_SUBMIT_URL  = 'http://78.47.110.193:5678/webhook/psychotest';
+// FIX: changed http:// → https:// to prevent mixed-content blocking in browsers/Telegram
+const N8N_SESSION_URL = 'https://78.47.110.193:5678/webhook/session';
+const N8N_SUBMIT_URL  = 'https://78.47.110.193:5678/webhook/psychotest';
 
 // ── Тести ─────────────────────────────────────────────────
 const TESTS = {
@@ -505,6 +509,18 @@ function showError(msg) {
   show('screen-error');
 }
 
+// FIX: fallback for crypto.randomUUID() in old WebViews
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    var v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // ── Зчитування токена ────────────────────────────────────
 function getSessionToken() {
   var urlParams = new URLSearchParams(window.location.search);
@@ -525,10 +541,51 @@ async function loadSession(token) {
   return await resp.json();
 }
 
+// ── Preview mode (bypass session) ────────────────────────
+// Usage: open HTML with ?preview=pcl5  OR  ?preview=minmult  OR  ?preview=schmishek
+function getPreviewType() {
+  var urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('preview') || null;
+}
+
+function initPreview(testType) {
+  if (!TESTS[testType]) {
+    showError('Невідомий тип тесту для preview: ' + testType + '. Доступні: pcl5, minmult, schmishek');
+    return;
+  }
+  state.sessionToken = 'preview';
+  state.sessionData  = {
+    test_type:    testType,
+    test_version: '1.0',
+    patient_name: '[ Preview / Тест ]'
+  };
+  state.answers = new Array(TESTS[testType].questions.length).fill(null);
+
+  var test = TESTS[testType];
+  document.getElementById('introEmoji').innerHTML   = test.emoji;
+  document.getElementById('introTitle').textContent = test.name;
+  document.getElementById('introSub').textContent   = test.desc + ' — ⚠️ PREVIEW';
+  document.getElementById('introName').textContent  = state.sessionData.patient_name;
+  document.getElementById('introCount').textContent = test.questions.length + ' питань';
+  document.getElementById('introTime').textContent  = test.time;
+
+  show('screen-intro');
+}
+
 // ── Ініціалізація ─────────────────────────────────────────
 async function init() {
-  if (tg) tg.enableClosingConfirmation();
+  // FIX: guard tg calls — only call if tg is available
+  if (tg) {
+    tg.enableClosingConfirmation();
+  }
   show('screen-loading');
+
+  // ── Preview mode: ?preview=pcl5 — skip n8n entirely ──
+  var previewType = getPreviewType();
+  if (previewType) {
+    initPreview(previewType);
+    return;
+  }
 
   var token = getSessionToken();
   if (!token) {
@@ -578,9 +635,13 @@ function renderQuestion() {
   document.getElementById('progressPct').textContent   = pct + '%';
   document.getElementById('progressFill').style.width  = pct + '%';
   document.getElementById('questionText').textContent  = test.questions[i];
-  document.getElementById('btnBack').style.visibility  = i === 0 ? 'hidden' : 'visible';
+
+  // FIX: use disabled attribute instead of visibility to prevent ghost clicks
+  var btnBack = document.getElementById('btnBack');
+  btnBack.disabled = (i === 0);
 
   var btnNext = document.getElementById('btnNext');
+  // FIX: set textContent only (no innerHTML needed), preserve button text correctly
   btnNext.textContent = (i === total - 1) ? 'Завершити' : 'Далі';
   btnNext.disabled    = (state.answers[i] === null);
 
@@ -621,7 +682,8 @@ function nextQuestion() {
 // ── Результат ────────────────────────────────────────────
 function showResult() {
   var test = TESTS[state.sessionData.test_type];
-  state.score    = state.answers.reduce(function(a,b){ return a + (b || 0); }, 0);
+  // FIX: filter out nulls explicitly before summing
+  state.score    = state.answers.reduce(function(a, b) { return a + (b !== null ? b : 0); }, 0);
   state.severity = test.getSeverity(state.score);
 
   document.getElementById('resultEmoji').innerHTML    = test.emoji;
@@ -639,10 +701,17 @@ function showResult() {
 
 // ── Надсилання ───────────────────────────────────────────
 async function sendResults() {
+  // Preview mode — do not send to n8n
+  if (state.sessionToken === 'preview') {
+    document.getElementById('doneText').textContent =
+      '⚠️ Preview-режим: результати не надсилаються. Бал: ' + state.score + ' — ' + state.severity.label;
+    show('screen-done');
+    return;
+  }
   show('screen-sending');
 
   var payload = {
-    submission_id: crypto.randomUUID(),
+    submission_id: generateUUID(), // FIX: use polyfilled version
     session_token: state.sessionToken,
     test_type:     state.sessionData.test_type,
     test_version:  state.sessionData.test_version || '1.0',
