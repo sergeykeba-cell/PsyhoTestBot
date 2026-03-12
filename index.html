@@ -252,15 +252,12 @@ html, body {
 </div>
 
 <script>
-// ── Telegram WebApp ───────────────────────────────────────
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── URLs ──────────────────────────────────────────────────
 const N8N_SESSION_URL = 'http://78.47.110.193:5678/webhook/session';
 const N8N_SUBMIT_URL  = 'http://78.47.110.193:5678/webhook/psychotest';
 
-// ── Тести ─────────────────────────────────────────────────
 const TESTS = {
   pcl5: {
     name: "PCL-5 (ПТСР)", emoji: "&#129504;",
@@ -388,90 +385,48 @@ const TESTS = {
     options: ["Так","Ні"],
     values:  [1, 0],
     questions: [
-      "Чи ви зазвичай спокійні та врівноважені?",
-      "Чи швидко ви забуваєте образи?",
-      "Чи буває у вас часто безпричинна зміна настрою?",
-      "Чи прагнете ви бути лідером у будь-якій ситуації?",
-      "Чи часто ви відчуваєте страх у темряві або на самоті?",
-      "Чи завжди ви дотримуєтесь черги в магазині чи транспорті?",
-      "Чи часто ви відчуваєте приплив енергії та бадьорості?",
-      "Чи часто вам кажуть, що ви занадто самовпевнені?",
-      "Чи схильні ви уникати конфліктів?",
-      "Чи легко вас вивести з рівноваги?",
-      "Чи відчуваєте ви надмірну стурбованість через дрібниці?",
-      "Чи часто ви відчуваєте внутрішній неспокій без видимих причин?",
-      "Чи схильні ви детально планувати свої дії?",
-      "Чи легко ви знайомитесь з новими людьми?",
-      "Чи часто ви відчуваєте пригніченість або смуток?",
-      "Чи часто у вас бувають перепади настрою (від ейфорії до депресії)?",
-      "Чи прагнете ви до ідеальності у будь-якій справі?",
-      "Чи любите ви бути в центрі уваги?",
-      "Чи схильні ви до частої зміни інтересів і захоплень?",
-      "Чи часто ви відчуваєте, що вас не розуміють оточуючі?",
-      "Чи довго ви пам'ятаєте образи?",
-      "Чи вам важко відмовити, коли вас про щось просять?",
-      "Чи вважаєте ви себе людиною з підвищеним почуттям відповідальності?",
-      "Чи часто ви буваєте надмірно балакучими?",
-      "Чи схильні ви до самоаналізу та роздумів про себе?",
-      "Чи часто ви відчуваєте тривогу перед майбутніми подіями?",
-      "Чи легко вас переконати змінити думку?",
-      "Чи часто ви піднімаєте настрій оточуючим своїми жартами?",
-      "Чи схильні ви до педантизму і надмірної ретельності?",
-      "Чи часто ви відчуваєте потребу в усамітненні?",
-      "Чи буває, що ви гостро реагуєте на критику?",
-      "Чи схильні ви до ризикованих дій або авантюр?",
-      "Чи часто ви відчуваєте роздратування без явних причин?",
-      "Чи прагнете ви завжди дотримуватись встановлених правил?",
-      "Чи буває, що у вас виникають нав'язливі думки або образи?",
-      "Чи часто ви відчуваєте підйом сил та натхнення?",
-      "Чи схильні ви бурхливо виражати свої емоції?",
-      "Чи часто ви відчуваєте невпевненість у власних силах?",
-      "Чи важко вам довго зосереджуватись на одному занятті?",
-      "Чи часто у вас виникає бажання зробити щось незвичне або екстравагантне?",
-      "Чи прагнете ви завжди виконувати свої обіцянки?",
-      "Чи буває, що через погані думки вам важко заснути?",
-      "Чи часто ви відчуваєте, що вам не вистачає часу?",
-      "Чи часто ви переживаєте за здоров'я своїх близьких?",
-      "Чи схильні ви аналізувати свої вчинки після їх здійснення?",
-      "Чи часто ви відчуваєте емоційне виснаження?",
-      "Чи буває, що ви підпорядковуєте свої бажання волі інших?",
-      "Чи легко вам переключитись з одного виду діяльності на інший?",
-      "Чи часто вам кажуть, що ви занадто серйозні?",
-      "Чи часто ви беретесь одночасно за кілька справ?",
-      "Чи схильні ви уникати відповідальних рішень?",
-      "Чи часто вам важко чекати або терпіти затримки?",
-      "Чи буває, що ви говорите неправду заради того, щоб уникнути конфлікту?",
-      "Чи часто ви відчуваєте страх зробити щось не так?",
-      "Чи схильні ви сильно переживати невдачі?",
-      "Чи часто ви відчуваєте надмірну збудженість або нервозність?",
-      "Чи часто у вас виникають незвичайні або оригінальні ідеї?",
-      "Чи схильні ви зберігати спокій у надзвичайних ситуаціях?",
-      "Чи часто вам хочеться різко змінити своє оточення або умови життя?",
-      "Чи схильні ви покладатися на інших у важких ситуаціях?",
-      "Чи часто ви відчуваєте потребу у схваленні з боку оточуючих?",
-      "Чи легко вам змиритися зі втратою або невдачею?",
-      "Чи часто у вас бувають напади смутку або тривоги без видимих причин?",
-      "Чи часто ви відчуваєте, що є обраним або особливим?",
-      "Чи схильні ви ретельно обмірковувати рішення перед їх прийняттям?",
-      "Чи часто ви відчуваєте надмірну втому від спілкування з людьми?",
-      "Чи буває, що ви поводитесь надто імпульсивно і потім шкодуєте про це?",
-      "Чи важко вам зберігати таємницю?",
-      "Чи схильні ви сильно переживати через критику на свою адресу?",
-      "Чи часто ви відчуваєте, що ситуація виходить з-під вашого контролю?",
-      "Чи часто у вас виникає бажання звернутися за підтримкою до інших?",
-      "Чи схильні ви до надмірної самокритики?",
-      "Чи буває, що ви відчуваєте ейфорію або надмірну радість без особливих причин?",
-      "Чи часто ви ставите власні потреби нижче потреб інших?",
-      "Чи схильні ви виявляти агресію у відповідь на несправедливість?",
-      "Чи часто ви відчуваєте нудьгу навіть під час активної діяльності?",
-      "Чи буває, що ви відчуваєте надмірну жалість до себе?",
-      "Чи часто ви відчуваєте потребу в нових враженнях або пригодах?",
-      "Чи схильні ви до надмірного контролю над собою та своїми емоціями?",
-      "Чи часто ви відчуваєте, що ваша поведінка відрізняється від поведінки більшості людей?",
-      "Чи часто ви відчуваєте, що не можете зупинитись, навіть коли втомились?",
-      "Чи буває, що ви підозрюєте людей у прихованих мотивах?",
-      "Чи часто ви відчуваєте надмірне збудження або тривогу перед важливими подіями?",
-      "Чи схильні ви до пошуку нових форм самовираження?"
+      "Чи ви зазвичай спокійні та врівноважені?","Чи швидко ви забуваєте образи?",
+      "Чи буває у вас часто безпричинна зміна настрою?","Чи прагнете ви бути лідером у будь-якій ситуації?",
+      "Чи часто ви відчуваєте страх у темряві або на самоті?","Чи завжди ви дотримуєтесь черги в магазині чи транспорті?",
+      "Чи часто ви відчуваєте приплив енергії та бадьорості?","Чи часто вам кажуть, що ви занадто самовпевнені?",
+      "Чи схильні ви уникати конфліктів?","Чи легко вас вивести з рівноваги?",
+      "Чи відчуваєте ви надмірну стурбованість через дрібниці?","Чи часто ви відчуваєте внутрішній неспокій без видимих причин?",
+      "Чи схильні ви детально планувати свої дії?","Чи легко ви знайомитесь з новими людьми?",
+      "Чи часто ви відчуваєте пригніченість або смуток?","Чи часто у вас бувають перепади настрою (від ейфорії до депресії)?",
+      "Чи прагнете ви до ідеальності у будь-якій справі?","Чи любите ви бути в центрі уваги?",
+      "Чи схильні ви до частої зміни інтересів і захоплень?","Чи часто ви відчуваєте, що вас не розуміють оточуючі?",
+      "Чи довго ви пам'ятаєте образи?","Чи вам важко відмовити, коли вас про щось просять?",
+      "Чи вважаєте ви себе людиною з підвищеним почуттям відповідальності?","Чи часто ви буваєте надмірно балакучими?",
+      "Чи схильні ви до самоаналізу та роздумів про себе?","Чи часто ви відчуваєте тривогу перед майбутніми подіями?",
+      "Чи легко вас переконати змінити думку?","Чи часто ви піднімаєте настрій оточуючим своїми жартами?",
+      "Чи схильні ви до педантизму і надмірної ретельності?","Чи часто ви відчуваєте потребу в усамітненні?",
+      "Чи буває, що ви гостро реагуєте на критику?","Чи схильні ви до ризикованих дій або авантюр?",
+      "Чи часто ви відчуваєте роздратування без явних причин?","Чи прагнете ви завжди дотримуватись встановлених правил?",
+      "Чи буває, що у вас виникають нав'язливі думки або образи?","Чи часто ви відчуваєте підйом сил та натхнення?",
+      "Чи схильні ви бурхливо виражати свої емоції?","Чи часто ви відчуваєте невпевненість у власних силах?",
+      "Чи важко вам довго зосереджуватись на одному занятті?","Чи часто у вас виникає бажання зробити щось незвичне або екстравагантне?",
+      "Чи прагнете ви завжди виконувати свої обіцянки?","Чи буває, що через погані думки вам важко заснути?",
+      "Чи часто ви відчуваєте, що вам не вистачає часу?","Чи часто ви переживаєте за здоров'я своїх близьких?",
+      "Чи схильні ви аналізувати свої вчинки після їх здійснення?","Чи часто ви відчуваєте емоційне виснаження?",
+      "Чи буває, що ви підпорядковуєте свої бажання волі інших?","Чи легко вам переключитись з одного виду діяльності на інший?",
+      "Чи часто вам кажуть, що ви занадто серйозні?","Чи часто ви беретесь одночасно за кілька справ?",
+      "Чи схильні ви уникати відповідальних рішень?","Чи часто вам важко чекати або терпіти затримки?",
+      "Чи буває, що ви говорите неправду заради того, щоб уникнути конфлікту?","Чи часто ви відчуваєте страх зробити щось не так?",
+      "Чи схильні ви сильно переживати невдачі?","Чи часто ви відчуваєте надмірну збудженість або нервозність?",
+      "Чи часто у вас виникають незвичайні або оригінальні ідеї?","Чи схильні ви зберігати спокій у надзвичайних ситуаціях?",
+      "Чи часто вам хочеться різко змінити своє оточення або умови життя?","Чи схильні ви покладатися на інших у важких ситуаціях?",
+      "Чи часто ви відчуваєте потребу у схваленні з боку оточуючих?","Чи легко вам змиритися зі втратою або невдачею?",
+      "Чи часто у вас бувають напади смутку або тривоги без видимих причин?","Чи часто ви відчуваєте, що є обраним або особливим?",
+      "Чи схильні ви ретельно обмірковувати рішення перед їх прийняттям?","Чи часто ви відчуваєте надмірну втому від спілкування з людьми?",
+      "Чи буває, що ви поводитесь надто імпульсивно і потім шкодуєте про це?","Чи важко вам зберігати таємницю?",
+      "Чи схильні ви сильно переживати через критику на свою адресу?","Чи часто ви відчуваєте, що ситуація виходить з-під вашого контролю?",
+      "Чи часто у вас виникає бажання звернутися за підтримкою до інших?","Чи схильні ви до надмірної самокритики?",
+      "Чи буває, що ви відчуваєте ейфорію або надмірну радість без особливих причин?","Чи часто ви ставите власні потреби нижче потреб інших?",
+      "Чи схильні ви виявляти агресію у відповідь на несправедливість?","Чи часто ви відчуваєте нудьгу навіть під час активної діяльності?",
+      "Чи буває, що ви відчуваєте надмірну жалість до себе?","Чи часто ви відчуваєте потребу в нових враженнях або пригодах?",
+      "Чи схильні ви до надмірного контролю над собою та своїми емоціями?","Чи часто ви відчуваєте, що ваша поведінка відрізняється від поведінки більшості людей?",
+      "Чи часто ви відчуваєте, що не можете зупинитись, навіть коли втомились?","Чи буває, що ви підозрюєте людей у прихованих мотивах?",
+      "Чи часто ви відчуваєте надмірне збудження або тривогу перед важливими подіями?","Чи схильні ви до пошуку нових форм самовираження?"
     ],
     getSeverity: function(s) {
       if (s <= 28) return { key:"low",      label:"В нормі",       cls:"sev-low" };
@@ -482,115 +437,80 @@ const TESTS = {
   }
 };
 
-// ── Стан ─────────────────────────────────────────────────
 var state = {
-  sessionToken: null,
-  sessionData:  null,
-  current:      0,
-  answers:      [],
-  score:        0,
-  severity:     null
+  sessionToken: null, sessionData: null,
+  current: 0, answers: [], score: 0, severity: null
 };
 
-// ── Утиліти ──────────────────────────────────────────────
 function show(id) {
-  document.querySelectorAll('.screen').forEach(function(s) {
-    s.classList.remove('active');
-  });
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
 }
+function showError(msg) { document.getElementById('errorMsg').textContent = msg; show('screen-error'); }
 
-function showError(msg) {
-  document.getElementById('errorMsg').textContent = msg;
-  show('screen-error');
-}
-
-// ── Зчитування токена ────────────────────────────────────
 function getSessionToken() {
-  var urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('token')) return urlParams.get('token');
-  var startParam = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
-  if (startParam) return startParam;
+  var p = new URLSearchParams(window.location.search);
+  if (p.get('token')) return p.get('token');
+  var sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  if (sp) return sp;
   if (window.location.hash) return window.location.hash.slice(1);
   return null;
 }
 
-// ── Завантаження сесії ───────────────────────────────────
 async function loadSession(token) {
-  var resp = await fetch(N8N_SESSION_URL + '?token=' + token, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' }
-  });
+  var resp = await fetch(N8N_SESSION_URL + '?token=' + token);
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   return await resp.json();
 }
 
-// ── Ініціалізація ─────────────────────────────────────────
 async function init() {
   if (tg) tg.enableClosingConfirmation();
   show('screen-loading');
-
   var token = getSessionToken();
-  if (!token) {
-    showError('Посилання недійсне або пошкоджене. Зверніться до лікаря.');
-    return;
-  }
+  if (!token) { showError('Посилання недійсне або пошкоджене.'); return; }
   state.sessionToken = token;
-
   try {
     var data = await loadSession(token);
     if (data.status === 'completed') { show('screen-used'); return; }
     if (data.status === 'expired')   { showError('Термін дії посилання минув.'); return; }
     if (!TESTS[data.test_type])      { showError('Невідомий тип тесту: ' + data.test_type); return; }
-
     state.sessionData = data;
     state.answers = new Array(TESTS[data.test_type].questions.length).fill(null);
-
     var test = TESTS[data.test_type];
-    document.getElementById('introEmoji').innerHTML  = test.emoji;
+    document.getElementById('introEmoji').innerHTML   = test.emoji;
     document.getElementById('introTitle').textContent = test.name;
     document.getElementById('introSub').textContent   = test.desc;
     document.getElementById('introName').textContent  = data.patient_name;
     document.getElementById('introCount').textContent = test.questions.length + ' питань';
     document.getElementById('introTime').textContent  = test.time;
-
     show('screen-intro');
   } catch(err) {
-    console.error('loadSession error:', err);
+    console.error(err);
     showError('Не вдалося завантажити тест. Перевірте з\'єднання.');
   }
 }
 
-// ── Тест ─────────────────────────────────────────────────
-function startTest() {
-  state.current = 0;
-  renderQuestion();
-  show('screen-test');
-}
+function startTest() { state.current = 0; renderQuestion(); show('screen-test'); }
 
 function renderQuestion() {
-  var test  = TESTS[state.sessionData.test_type];
-  var total = test.questions.length;
-  var i     = state.current;
-  var pct   = Math.round((i / total) * 100);
-
-  document.getElementById('progressLabel').textContent = 'Питання ' + (i+1) + ' з ' + total;
-  document.getElementById('progressPct').textContent   = pct + '%';
-  document.getElementById('progressFill').style.width  = pct + '%';
+  var test = TESTS[state.sessionData.test_type];
+  var total = test.questions.length, i = state.current;
+  var pct = Math.round((i/total)*100);
+  document.getElementById('progressLabel').textContent = 'Питання '+(i+1)+' з '+total;
+  document.getElementById('progressPct').textContent   = pct+'%';
+  document.getElementById('progressFill').style.width  = pct+'%';
   document.getElementById('questionText').textContent  = test.questions[i];
-  document.getElementById('btnBack').style.visibility  = i === 0 ? 'hidden' : 'visible';
-
+  document.getElementById('btnBack').style.visibility  = i===0?'hidden':'visible';
   var btnNext = document.getElementById('btnNext');
-  btnNext.textContent = (i === total - 1) ? 'Завершити' : 'Далі';
-  btnNext.disabled    = (state.answers[i] === null);
-
+  btnNext.textContent = (i===total-1)?'Завершити':'Далі';
+  btnNext.disabled = (state.answers[i]===null);
   var list = document.getElementById('optionsList');
   list.innerHTML = '';
-  test.options.forEach(function(label, idx) {
+  test.options.forEach(function(label,idx){
     var btn = document.createElement('button');
-    btn.className = 'option-btn' + (state.answers[i] === test.values[idx] ? ' selected' : '');
-    btn.innerHTML = '<div class="option-circle"></div><span>' + label + '</span>';
-    btn.onclick = function() { selectOption(idx); };
+    btn.className = 'option-btn'+(state.answers[i]===test.values[idx]?' selected':'');
+    btn.innerHTML = '<div class="option-circle"></div><span>'+label+'</span>';
+    btn.onclick = function(){ selectOption(idx); };
     list.appendChild(btn);
   });
 }
@@ -602,76 +522,53 @@ function selectOption(idx) {
   document.getElementById('btnNext').disabled = false;
   if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
 }
-
-function prevQuestion() {
-  if (state.current > 0) { state.current--; renderQuestion(); }
-}
-
+function prevQuestion() { if(state.current>0){state.current--;renderQuestion();} }
 function nextQuestion() {
   var total = TESTS[state.sessionData.test_type].questions.length;
-  if (state.answers[state.current] === null) return;
-  if (state.current < total - 1) {
-    state.current++;
-    renderQuestion();
-  } else {
-    showResult();
-  }
+  if(state.answers[state.current]===null) return;
+  if(state.current<total-1){state.current++;renderQuestion();}
+  else showResult();
 }
 
-// ── Результат ────────────────────────────────────────────
 function showResult() {
   var test = TESTS[state.sessionData.test_type];
-  state.score    = state.answers.reduce(function(a,b){ return a + (b || 0); }, 0);
+  state.score    = state.answers.reduce(function(a,b){return a+(b||0);},0);
   state.severity = test.getSeverity(state.score);
-
   document.getElementById('resultEmoji').innerHTML    = test.emoji;
   document.getElementById('resultSub').textContent    = state.sessionData.patient_name;
   document.getElementById('rTestName').textContent    = test.name;
   document.getElementById('rPatientName').textContent = state.sessionData.patient_name;
   document.getElementById('rScore').textContent       = state.score;
   document.getElementById('rDate').textContent        = new Date().toLocaleDateString('uk-UA');
-
   var sevEl = document.getElementById('rSeverity');
-  sevEl.innerHTML = '<span class="severity-badge ' + state.severity.cls + '">' + state.severity.label + '</span>';
-
+  sevEl.innerHTML = '<span class="severity-badge '+state.severity.cls+'">'+state.severity.label+'</span>';
   show('screen-result');
 }
 
-// ── Надсилання ───────────────────────────────────────────
 async function sendResults() {
   show('screen-sending');
-
   var payload = {
     submission_id: crypto.randomUUID(),
     session_token: state.sessionToken,
     test_type:     state.sessionData.test_type,
-    test_version:  state.sessionData.test_version || '1.0',
+    test_version:  state.sessionData.test_version||'1.0',
     patient_name:  state.sessionData.patient_name,
     score:         state.score,
     severity:      state.severity.key,
     answers:       state.answers,
     timestamp:     Date.now(),
-    telegram_id:   tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null
+    telegram_id:   tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user.id:null
   };
-
   try {
-    var resp = await fetch(N8N_SUBMIT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    document.getElementById('doneText').textContent =
-      'Результати надіслано лікарю. Очікуйте на зворотний зв\'язок найближчим часом.';
+    var resp = await fetch(N8N_SUBMIT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    if(tg&&tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     show('screen-done');
-    setTimeout(function() { if (tg) tg.close(); }, 3000);
-
+    setTimeout(function(){if(tg)tg.close();},3000);
   } catch(err) {
-    console.error('sendResults error:', err);
+    console.error(err);
     show('screen-result');
-    alert('Не вдалося надіслати. Перевірте з\'єднання і спробуйте ще раз.');
+    alert('Не вдалося надіслати. Спробуйте ще раз.');
   }
 }
 
