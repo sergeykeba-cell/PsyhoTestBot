@@ -230,8 +230,8 @@ html, body {
       <span class="result-row-value" id="rDate">—</span>
     </div>
   </div>
-  <p class="result-note">
-    Детальний звіт з інтерпретацією буде надіслано вашому лікарю автоматично після підтвердження.
+  <p class="result-note" id="resultNote">
+    Результати буде надіслано лікарю автоматично через 2 секунди.
   </p>
   <button class="btn-primary" onclick="sendResults()">
     &#9989; Надіслати лікарю
@@ -442,6 +442,9 @@ var state = {
   current: 0, answers: [], score: 0, severity: null
 };
 
+// Таймер автоматичного надсилання
+var autoSendTimer = null;
+
 function show(id) {
   document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
@@ -542,10 +545,30 @@ function showResult() {
   document.getElementById('rDate').textContent        = new Date().toLocaleDateString('uk-UA');
   var sevEl = document.getElementById('rSeverity');
   sevEl.innerHTML = '<span class="severity-badge '+state.severity.cls+'">'+state.severity.label+'</span>';
+  
+  // Оновлюємо текст підказки
+  document.querySelector('#screen-result .result-note').innerHTML = 
+    'Результати буде надіслано лікарю автоматично через 2 секунди.';
+
+  // Очистити попередній таймер (якщо є)
+  if (autoSendTimer) {
+    clearTimeout(autoSendTimer);
+    autoSendTimer = null;
+  }
+  
+  // Встановити автоматичне надсилання через 2 секунди
+  autoSendTimer = setTimeout(sendResults, 2000);
+
   show('screen-result');
 }
 
 async function sendResults() {
+  // Очистити таймер, щоб не надіслати двічі
+  if (autoSendTimer) {
+    clearTimeout(autoSendTimer);
+    autoSendTimer = null;
+  }
+
   show('screen-sending');
   var payload = {
     submission_id: crypto.randomUUID(),
@@ -567,7 +590,7 @@ async function sendResults() {
     setTimeout(function(){if(tg)tg.close();},3000);
   } catch(err) {
     console.error(err);
-    show('screen-result');
+    show('screen-result');  // повертаємося до екрана результату (без автоматичного повторного надсилання)
     alert('Не вдалося надіслати. Спробуйте ще раз.');
   }
 }
