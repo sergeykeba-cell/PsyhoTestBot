@@ -1,0 +1,613 @@
+{
+  "name": "Психодіагностика — Головний Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  t.token,\n  t.full_name AS patient_name,\n  t.test_type,\n  t.test_version,\n  t.status,\n  d.telegram_id AS doctor_telegram_id\nFROM tokens t\nLEFT JOIN doctors d ON d.id = t.doctor_id\nWHERE t.token = '{{ $json.query.token }}'\nLIMIT 1",
+        "options": {}
+      },
+      "id": "1efbe441-2816-46e6-b2c3-207f40b96576",
+      "name": "DB: Get Session1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -448,
+        2064
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6cac0a46-6a62-4585-935f-923594fb08d6",
+      "name": "Session Found?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "psychotest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cdea5016-84ef-4962-8b43-9012c1d24e82",
+      "name": "POST /psychotest1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        2448
+      ],
+      "webhookId": "241acb79-487b-45fe-9972-d6ca100c0dfb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.submission_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "20993a9d-a1d7-4116-aa13-fb047f864c2c"
+            },
+            {
+              "leftValue": "={{ $json.body.session_token }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "7f19d546-aee4-4a36-abff-27a5d183906c"
+            },
+            {
+              "leftValue": "={{ $json.body.test_type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "e1ed4d5e-d5a3-474e-ad3e-5c30d56530ee"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2e882ddc-1ad1-4fea-a87d-94be35f7a5c3",
+      "name": "Validate Input1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Invalid input\", \"status\": \"validation_error\"}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "091f2380-afb4-4942-b223-7030756b32be",
+      "name": "Respond: ",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json[0]?.status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equal"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4dcb071-6074-42c9-a274-1e15fd56102e",
+      "name": "Session Pending?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        0,
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Test already completed\", \"status\": \"completed\"}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "a2d35032-6d4e-424e-8cdd-1dcf9228173e",
+      "name": "Respond: 409 Already Used1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        224,
+        2672
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tokens \nSET status = 'completed', used_at = NOW() \nWHERE token = $1",
+        "options": {
+          "queryReplacement": "={{ $('Validate Input1').item.json.body.session_token }}"
+        }
+      },
+      "id": "01d5a704-2a13-4c46-8221-fb0e2f290e96",
+      "name": "DB: Mark Session Completed1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        2448
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"ok\", \"message\": \"Results received\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b77be711-c797-4d64-9089-5f790983750a",
+      "name": "Respond: 200 OK1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        448,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const start = Date.now();\nconst body = $('Validate Input1').item.json.body;\n\nconst test_type = body.test_type || '';\nconst patient   = body.patient_name || 'Невідомий';\n\n// ── Нормалізація відповідей ──────────────────────────────────────────────────\nlet raw = body.answers || [];\nlet answers;\nif (!Array.isArray(raw) && typeof raw === 'object') {\n  answers = Object.keys(raw).sort((a,b)=>parseInt(a)-parseInt(b)).map(k=>parseInt(raw[k])||0);\n} else {\n  answers = raw.map(a=>parseInt(a)||0);\n}\n\nfunction resolveType(declared, ans) {\n  if (['pcl5','minmult','schmishek'].includes(declared)) return declared;\n  if (ans.length <= 20) return 'pcl5';\n  if (ans.length <= 71) return 'minmult';\n  return 'schmishek';\n}\nconst resolved_type = resolveType(test_type, answers);\n\n// ── PCL-5 (20 питань, шкала 0-4) ────────────────────────────────────────────\n// Кластери DSM-5:\n// B (1-5)  — Вторгнення\n// C (6-7)  — Уникнення\n// D (8-14) — Негативні зміни когніцій/настрою\n// E (15-20)— Гіперзбудження\nfunction score_pcl5(ans) {\n  const a = ans.slice(0, 20);\n  const total = a.reduce((s,v)=>s+v, 0);\n  const B = a.slice(0,5).reduce((s,v)=>s+v,0);\n  const C = a.slice(5,7).reduce((s,v)=>s+v,0);\n  const D = a.slice(7,14).reduce((s,v)=>s+v,0);\n  const E = a.slice(14,20).reduce((s,v)=>s+v,0);\n  // Імовірний ПТСР: поріг ≥33 + хоча б один кластер перевищений\n  const ptsd_probable = total >= 33 && (B>=10 || C>=4 || D>=14 || E>=12);\n  let severity, severity_ua;\n  if (total <= 32)      { severity='low';      severity_ua='Мінімальний'; }\n  else if (total <= 44) { severity='moderate'; severity_ua='Легкий'; }\n  else if (total <= 56) { severity='high';     severity_ua='Помірний'; }\n  else                  { severity='severe';   severity_ua='Важкий'; }\n  return {\n    total, severity, severity_ua, ptsd_probable,\n    subscales: {\n      'B_Вторгнення': B,\n      'C_Уникнення': C,\n      'D_Когніції': D,\n      'E_Збудження': E\n    }\n  };\n}\n\n// ── Міні-Мульт — 71 питання, власний опитувальник ───────────────────────────\n// Питання згруповані по психопатологічних темах.\n// Ключі (1-based) складені на основі змісту питань з документу.\n// \"yes\" = відповідь \"Так\" (1) додає бал до шкали\n// \"no\"  = відповідь \"Ні\"  (0) додає бал до шкали\nconst MM_SCALES = {\n  'Іпохондрія_Hs': {\n    yes: [2,3,6,21,22,28,32,39,45,46,64,65],\n    no:  [30,50,59,61]\n  },\n  'Депресія_D': {\n    yes: [11,15,18,19,22,24,33,34,36,37,41,54,56,57,58,63,64,67,70],\n    no:  [5,49,59,62]\n  },\n  'Істерія_Hy': {\n    yes: [2,3,6,7,14,21,22,28,32,39,45,46,65],\n    no:  [17,19,26,29,38,51]\n  },\n  'Психопатія_Pd': {\n    yes: [10,13,16,18,23,24,26,33,43,55,56,63,67],\n    no:  [9,17,29,42,50,57,62]\n  },\n  'Параноя_Pa': {\n    yes: [10,12,13,14,20,26,36,37,41,43,57,63,67,68],\n    no:  [25,38,51,52,59]\n  },\n  'Психастенія_Pt': {\n    yes: [2,3,7,15,19,22,24,37,38,41,47,54,56,58,63,67,70],\n    no:  [30,59,62]\n  },\n  'Шизофренія_Sc': {\n    yes: [7,8,20,24,26,27,33,36,37,41,43,44,46,47,53,54,56,63,65,67,70],\n    no:  [17,29,38,49,50,52,59,62]\n  },\n  'Гіпоманія_Ma': {\n    yes: [4,5,16,23,26,42,43,51,53,55,58,64,67],\n    no:  [9,36,50,57,62]\n  },\n  'Соціальна_інтроверсія_Si': {\n    yes: [8,25,40,52,53,68],\n    no:  [4,14,16,17,28,49,55,64,66]\n  },\n};\n\nfunction score_minmult(ans) {\n  const a = ans.slice(0, 71);\n  const scales = {};\n  for (const [scale, keys] of Object.entries(MM_SCALES)) {\n    let s = 0;\n    for (const k of keys.yes) { if (k<=a.length && a[k-1]===1) s++; }\n    for (const k of keys.no)  { if (k<=a.length && a[k-1]===0) s++; }\n    scales[scale] = s;\n  }\n  const clinical_names = Object.keys(MM_SCALES);\n  const values = clinical_names.map(n=>scales[n]);\n  const maxVal = Math.max(...values);\n  const total  = values.reduce((s,v)=>s+v, 0);\n  const peak_scale = clinical_names[values.indexOf(maxVal)];\n\n  // Шкали достовірності\n  const L = [6,9,15,17,29,30,35,50,59,62].filter(k=>k<=a.length&&a[k-1]===1).length;\n  const F = [7,10,13,14,20,23,24,26,27,31,33,36,37,41,43,44,46,47,51,53,54,55,56,58,63,65,67,70].filter(k=>k<=a.length&&a[k-1]===1).length;\n  const K = [9,26,30,57,62].filter(k=>k<=a.length&&a[k-1]===1).length +\n            [8,19,21,22,25,38,40,42,50,52,59,68].filter(k=>k<=a.length&&a[k-1]===0).length;\n\n  let severity, severity_ua;\n  if (maxVal <= 4)       { severity='low';      severity_ua='В нормі'; }\n  else if (maxVal <= 7)  { severity='moderate'; severity_ua='Субнорма'; }\n  else if (maxVal <= 10) { severity='high';     severity_ua='Відхилення'; }\n  else                   { severity='severe';   severity_ua='Виражений'; }\n\n  return {\n    total, severity, severity_ua, peak_scale,\n    subscales: scales,\n    validity: { L, F, K },\n    elevated_scales: clinical_names.filter(n=>scales[n]>=8)\n  };\n}\n\n// ── Шмішек — 88 питань, 10 шкал акцентуацій (Леонгард) ─────────────────────\n// Ключі прив'язані до змісту власних питань з документу\nconst SCH_SCALES = {\n  'Гіпертимія': {\n    yes: [7,11,36,50],\n    no:  [30,58]\n  },\n  'Дистимія': {\n    yes: [15,38,46,55,64,71],\n    no:  [1,14,28,48]\n  },\n  'Циклотимія': {\n    yes: [3,16,72,76],\n    no:  []\n  },\n  'Збудливість': {\n    yes: [10,33,52,75,79,83],\n    no:  []\n  },\n  'Застрягання': {\n    yes: [21,31,56,69,73],\n    no:  [2,27,47]\n  },\n  'Педантизм': {\n    yes: [13,17,29,34,41,43],\n    no:  [36]\n  },\n  'Тривожність': {\n    yes: [5,11,26,38,54,60],\n    no:  [1,6]\n  },\n  'Емотивність': {\n    yes: [3,15,37,45,68,78],\n    no:  [58]\n  },\n  'Демонстративність': {\n    yes: [4,18,24,28,40,64,66,80,85],\n    no:  [51]\n  },\n  'Екзальтованість': {\n    yes: [7,36,57,72,77,82,86],\n    no:  []\n  },\n};\n\nfunction score_schmishek(ans) {\n  const a = ans.slice(0, 88);\n  const scales = {};\n  for (const [scale, keys] of Object.entries(SCH_SCALES)) {\n    let s = 0;\n    for (const k of keys.yes) { if (k<=a.length && a[k-1]===1) s++; }\n    for (const k of keys.no)  { if (k<=a.length && a[k-1]===0) s++; }\n    // Нормування до 24 балів (як в оригінальному Шмішеку)\n    const max_keys = (keys.yes.length + keys.no.length);\n    scales[scale] = max_keys > 0 ? Math.round(s * 24 / max_keys) : 0;\n  }\n  const entries   = Object.entries(scales);\n  const peak      = entries.sort(([,a],[,b])=>b-a)[0];\n  const total     = entries.reduce((s,[,v])=>s+v, 0);\n  const accentuated = Object.entries(scales).filter(([,v])=>v>=19).map(([k])=>k);\n\n  let severity, severity_ua;\n  if (accentuated.length === 0)     { severity='low';      severity_ua='В нормі'; }\n  else if (accentuated.length <= 2) { severity='moderate'; severity_ua='Акцентуація'; }\n  else if (accentuated.length <= 4) { severity='high';     severity_ua='Виражена'; }\n  else                              { severity='severe';   severity_ua='Дуже виражена'; }\n\n  return {\n    total, severity, severity_ua,\n    subscales: Object.fromEntries(Object.entries(scales).sort(([,a],[,b])=>b-a)),\n    accentuated_types: accentuated,\n    peak_type: peak?.[0],\n    peak_score: peak?.[1]\n  };\n}\n\n// ── Запуск ───────────────────────────────────────────────────────────────────\nconst scorers    = { pcl5: score_pcl5, minmult: score_minmult, schmishek: score_schmishek };\nconst test_names = { pcl5:'PCL-5 (ПТСР)', minmult:'Міні-Мульт (MMPI)', schmishek:'Шмішек (акцентуації)' };\n\nif (!scorers[resolved_type]) throw new Error('Unknown test_type: ' + resolved_type);\n\nconst result = scorers[resolved_type](answers);\nconst scoring_time_ms = Date.now() - start;\n\nreturn [{\n  json: {\n    ...body,\n    answers,\n    test_type:        resolved_type,\n    test_name:        test_names[resolved_type],\n    score:            result.total,\n    severity:         result.severity,\n    severity_ua:      result.severity_ua,\n    subscales:        result.subscales,\n    scoring_time_ms,\n    // Поля специфічні для кожного тесту\n    ...(result.ptsd_probable     !== undefined && { ptsd_probable:     result.ptsd_probable }),\n    ...(result.peak_scale        !== undefined && { peak_scale:        result.peak_scale }),\n    ...(result.elevated_scales   !== undefined && { elevated_scales:   result.elevated_scales }),\n    ...(result.validity          !== undefined && { validity:          result.validity }),\n    ...(result.accentuated_types !== undefined && { accentuated_types: result.accentuated_types }),\n    ...(result.peak_type         !== undefined && { peak_type:         result.peak_type }),\n    ...(result.peak_score        !== undefined && { peak_score:        result.peak_score }),\n  }\n}];\n"
+      },
+      "id": "e8763839-be02-418b-b4db-64a21654571d",
+      "name": "JS: Scoring1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        2496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO results\n  (submission_id, token, full_name, test_type, answers,\n   score, severity, status, scoring_time_ms, n8n_execution_id)\nVALUES\n  ($1::uuid, $2, $3, $4, $5::jsonb,\n   $6, $7, 'scored', $8, $9)\nON CONFLICT (submission_id) DO UPDATE\n  SET updated_at = NOW()\nRETURNING id, token",
+        "options": {
+          "queryReplacement": "={{ $('Validate Input1').item.json.body.submission_id }},{{ $('Validate Input1').item.json.body.session_token }},{{ $('Validate Input1').item.json.body.patient_name }},{{ $('Validate Input1').item.json.body.test_type }},{{ JSON.stringify($('Validate Input1').item.json.body.answers) }},{{ $('Validate Input1').item.json.body.score }},{{ $('Validate Input1').item.json.body.severity }},{{ $json.scoring_time_ms }},{{ $execution.id }}"
+        }
+      },
+      "id": "84fb5b08-c95d-4d29-99e3-292861c5c546",
+      "name": "DB: Save Result1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        816,
+        2400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://78.47.110.193:8080/result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_token\": \"{{ $('Validate Input1').item.json.body.session_token }}\",\n  \"score\": {{ $('JS: Scoring1').item.json.score }},\n  \"severity\": \"{{ $('JS: Scoring1').item.json.severity }}\",\n  \"severity_ua\": \"{{ $('JS: Scoring1').item.json.severity_ua }}\",\n  \"patient_name\": \"{{ $('JS: Scoring1').item.json.patient_name }}\",\n  \"test_type\": \"{{ $('JS: Scoring1').item.json.test_type }}\",\n  \"test_name\": \"{{ $('JS: Scoring1').item.json.test_name }}\",\n  \"subscales\": {{ JSON.stringify($('JS: Scoring1').item.json.subscales ?? {}) }},\n  \"ptsd_probable\": {{ $('JS: Scoring1').item.json.ptsd_probable ?? false }},\n  \"peak_scale\": \"{{ $('JS: Scoring1').item.json.peak_scale ?? '' }}\",\n  \"peak_type\": \"{{ $('JS: Scoring1').item.json.peak_type ?? '' }}\",\n  \"accentuated_types\": {{ JSON.stringify($('JS: Scoring1').item.json.accentuated_types ?? []) }},\n  \"ai_interpretation\": \"{{ $json.ai_interpretation ?? '' }}\"\n}",
+        "options": {}
+      },
+      "id": "b8e1b629-0667-47da-a6de-db0f09910079",
+      "name": "HTTP: Notify Doctor1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        2320
+      ],
+      "webhookId": "00ed5bdb-6662-40ce-852d-3dd2bab56ac4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE results \nSET status = 'notified', updated_at = NOW()\nWHERE submission_id = $1::uuid",
+        "options": {
+          "queryReplacement": "={{ $('Validate Input1').item.json.body.submission_id }}"
+        }
+      },
+      "id": "0c2db8a2-4e48-4949-85d2-8c8ffdc10d6b",
+      "name": "DB: Mark Notified1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1984,
+        2320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO error_logs (n8n_execution_id, node_name, error_message, input_data) VALUES ('{{ $execution.id }}', 'Scoring/DB Error', '{{ $json.error?.message ?? \"Unknown error\" }}', '{{ JSON.stringify($json) }}'::jsonb)",
+        "options": {}
+      },
+      "id": "13049664-5ac0-4040-9ee2-5513fcb0484d",
+      "name": "DB: Log Error1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        768,
+        2128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "session",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "54aab5c8-8c88-4b57-b4bf-c15625ccbb0f",
+      "name": "GET /session1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        2064
+      ],
+      "webhookId": "eba67030-47ee-40b5-b801-e49b57855edf"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('DB: Get Session1').first().json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond: Session Data1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        48,
+        2032
+      ],
+      "id": "62981151-ce61-416a-bf74-c2011fb8ab6e"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\":\"Session not found\",\"code\":404}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond: 405",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        48,
+        2128
+      ],
+      "id": "845c13fb-4dd0-4615-adb3-47c0dbddf9f6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT status, used, expires_at \nFROM tokens \nWHERE token = $1\nLIMIT 1",
+        "options": {
+          "queryReplacement": "={{ $json.body.session_token}}"
+        }
+      },
+      "id": "3e2a6b9d-ec1c-459e-b941-10692426e5b1",
+      "name": "DB: Check Session Status1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -224,
+        2448
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d.telegram_id\nFROM tokens t\nJOIN doctors d ON d.id = t.doctor_id\nWHERE t.token = $1",
+        "options": {
+          "queryReplacement": "={{ $('Validate Input1').item.json.body.session_token }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1280,
+        2352
+      ],
+      "id": "036b4af6-ec8c-424a-8004-d1d40ff8d350",
+      "name": "DB: Get Doctor1",
+      "credentials": {
+        "postgres": {
+          "id": "rSaWTC8b6UpIWeIK",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "DB: Get Session1": {
+      "main": [
+        [
+          {
+            "node": "Session Found?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Found?1": {
+      "main": [
+        [
+          {
+            "node": "Respond: Session Data1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: 405",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /psychotest1": {
+      "main": [
+        [
+          {
+            "node": "Validate Input1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input1": {
+      "main": [
+        [
+          {
+            "node": "DB: Check Session Status1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Pending?1": {
+      "main": [
+        [
+          {
+            "node": "DB: Mark Session Completed1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: 409 Already Used1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Mark Session Completed1": {
+      "main": [
+        [
+          {
+            "node": "Respond: 200 OK1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "JS: Scoring1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JS: Scoring1": {
+      "main": [
+        [
+          {
+            "node": "DB: Save Result1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DB: Log Error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Save Result1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Notify Doctor1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /session1": {
+      "main": [
+        [
+          {
+            "node": "DB: Get Session1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Check Session Status1": {
+      "main": [
+        [
+          {
+            "node": "Session Pending?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Get Doctor1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Notify Doctor1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Notify Doctor1": {
+      "main": [
+        [
+          {
+            "node": "DB: Mark Notified1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a49c7a3f-7ec9-41ec-9b25-a8bf757d3f1e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "53024978c270d393c14a67bbe0731b54e861708369a4efdf653dd0c69d85ff1e"
+  },
+  "id": "JE2E5cijQGsXY2tT",
+  "tags": []
+}
