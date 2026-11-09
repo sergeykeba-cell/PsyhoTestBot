@@ -470,12 +470,12 @@ function nextQuestion() {
 function showResult() {
   var test   = TESTS[state.sessionData.test_type];
   state.score    = state.answers.reduce(function(a,b){return a+(b||0);},0);
-  state.severity = test.getSeverity(state.score);
+  state.severity = {key:'pending', label:'Передано лікарю', cls:''};
   document.getElementById('resultEmoji').textContent    = test.emoji;
   document.getElementById('resultSub').textContent      = state.sessionData.patient_name;
   document.getElementById('rTestName').textContent      = test.name;
   document.getElementById('rPatientName').textContent   = state.sessionData.patient_name;
-  document.getElementById('rScore').textContent         = state.score;
+  document.getElementById('rScore').textContent         = '—';
   document.getElementById('rDate').textContent          = new Date().toLocaleDateString('uk-UA');
   var sevEl = document.getElementById('rSeverity');
   sevEl.innerHTML = '<span class="severity-badge '+state.severity.cls+'">'+state.severity.label+'</span>';

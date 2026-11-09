@@ -43,13 +43,17 @@ BOT_TOKEN    = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 MINI_APP_URL = os.getenv("MINI_APP_URL")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "127.0.0.1")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 WEBHOOK_PATH = "/result"
 ADMIN_TG_ID  = int(os.getenv("ADMIN_TG_ID", "0"))
 
+from report import generate_pdf_report, parse_details
+
 TESTS = {
-    "pcl5":      {"name": "PCL-5 (PTSD)",                    "emoji": "🧠"},
-    "minmult":   {"name": "Mini-Mult (short MMPI)",           "emoji": "📋"},
-    "schmishek": {"name": "Schmishek (character accentuations)", "emoji": "🔍"},
+    "pcl5":      {"name": "PCL-5 (ПТСР)",                    "emoji": "🧠"},
+    # "minmult":   {"name": "Mini-Mult (short MMPI)",           "emoji": "📋"},
+    # "schmishek": {"name": "Schmishek (character accentuations)", "emoji": "🔍"},
 }
 
 logging.basicConfig(
@@ -165,99 +169,15 @@ async def generate_qr_bytes(url: str) -> bytes:
 
 # ── PDF Report ───────────────────────────────────────────────
 
-def generate_pdf_report(result_data: dict) -> BytesIO:
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=2*cm, leftMargin=2*cm,
-                            topMargin=2*cm, bottomMargin=2*cm)
-    story = []
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'],
-                                 fontSize=18, spaceAfter=30, alignment=1)
-    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'],
-                                   fontSize=14, textColor=colors.HexColor('#2563eb'),
-                                   spaceAfter=12, spaceBefore=12)
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'],
-                                  fontSize=11, leading=14)
-
-    test_name = TESTS.get(result_data.get('test_type', ''), {}).get('name', result_data.get('test_type', ''))
-    story.append(Paragraph("TEST REPORT", title_style))
-    story.append(Paragraph(test_name, heading_style))
-    story.append(Spacer(1, 0.5*cm))
-
-    completed_at = result_data.get('completed_at', datetime.now())
-    if isinstance(completed_at, str):
-        completed_at = datetime.now()
-
-    info_data = [
-        ['Patient:', result_data.get('patient_name', '—')],
-        ['Date:', completed_at.strftime('%d.%m.%Y %H:%M')],
-        ['Total score:', str(result_data.get('score', '—'))],
-        ['Severity level:', str(result_data.get('severity', '—')).upper()],
-    ]
-    info_table = Table(info_data, colWidths=[5*cm, 10*cm])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f4f4f5')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(info_table)
-    story.append(Spacer(1, 1*cm))
-
-    story.append(Paragraph("INTERPRETATION", heading_style))
-    severity  = result_data.get('severity', 'low')
-    score     = result_data.get('score', 0)
-    test_type = result_data.get('test_type', '')
-
-    interp_map = {
-        'pcl5': {
-            'low':      f"Total score {score} indicates minimal PTSD symptoms. Result is within normal range.",
-            'moderate': f"Total score {score} indicates mild PTSD symptoms. Monitoring recommended.",
-            'high':     f"Total score {score} indicates moderate PTSD symptoms. Specialist consultation recommended.",
-            'severe':   f"Total score {score} indicates severe PTSD symptoms. Psychotherapeutic intervention required.",
-        },
-        'minmult': {
-            'low':      "Results within normal range. No significant personality deviations detected.",
-            'moderate': "Some personality accentuations detected (sub-norm). Clarifying diagnostics recommended.",
-            'high':     "Personality profile deviations detected. Psychological consultation recommended.",
-            'severe':   "Significant personality profile deviations. Psychological assistance recommended.",
-        },
-        'schmishek': {
-            'low':      "No character accentuations detected. Personality profile within normal range.",
-            'moderate': "Character accentuations detected (normal variant). Consider in communication approach.",
-            'high':     "Pronounced character accentuations detected. Psychologist consultation recommended.",
-            'severe':   "Very pronounced character accentuations. Psychological assistance required.",
-        },
-    }
-    interp = interp_map.get(test_type, {}).get(severity, f"Score: {score}, Severity: {severity}")
-    story.append(Paragraph(interp, normal_style))
-
-    story.append(Spacer(1, 1*cm))
-    story.append(Paragraph("DISCLAIMER", heading_style))
-    story.append(Paragraph(
-        "This report is for informational purposes only and does not constitute a medical diagnosis. "
-        "For professional consultation and result interpretation, please refer to a qualified specialist.",
-        normal_style
-    ))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
 
 # ── Keyboards ────────────────────────────────────────────────
 
 def kb_main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="➕ New Test",          callback_data="menu:newtest")],
-        [InlineKeyboardButton(text="📋 Active Sessions",   callback_data="menu:sessions")],
-        [InlineKeyboardButton(text="✅ Completed Tests",   callback_data="menu:completed")],
-        [InlineKeyboardButton(text="❓ Help",              callback_data="menu:help")],
+        [InlineKeyboardButton(text="➕ Новий тест",         callback_data="menu:newtest")],
+        [InlineKeyboardButton(text="📋 Активні сесії",      callback_data="menu:sessions")],
+        [InlineKeyboardButton(text="✅ Завершені тести",    callback_data="menu:completed")],
+        [InlineKeyboardButton(text="❓ Допомога",           callback_data="menu:help")],
     ])
 
 
@@ -266,25 +186,25 @@ def kb_test_selection() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=f"{v['emoji']} {v['name']}", callback_data=f"test:{k}")]
         for k, v in TESTS.items()
     ]
-    buttons.append([InlineKeyboardButton(text="◀️ Back", callback_data="menu:main")])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def kb_confirm() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✅ Confirm",    callback_data="confirm:yes"),
-            InlineKeyboardButton(text="✏️ Edit name", callback_data="confirm:rename"),
+            InlineKeyboardButton(text="✅ Підтвердити",   callback_data="confirm:yes"),
+            InlineKeyboardButton(text="✏️ Змінити ПІБ",  callback_data="confirm:rename"),
         ],
-        [InlineKeyboardButton(text="❌ Cancel", callback_data="confirm:cancel")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="confirm:cancel")],
     ])
 
 
 def kb_session_item(token: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📄 View result",    callback_data=f"view:{token}")],
-        [InlineKeyboardButton(text="📥 Download PDF",   callback_data=f"pdf:{token}")],
-        [InlineKeyboardButton(text="◀️ Back to list",   callback_data="menu:completed")],
+        [InlineKeyboardButton(text="📄 Переглянути результат", callback_data=f"view:{token}")],
+        [InlineKeyboardButton(text="📥 Завантажити PDF",       callback_data=f"pdf:{token}")],
+        [InlineKeyboardButton(text="◀️ До списку",             callback_data="menu:completed")],
     ])
 
 
@@ -295,16 +215,16 @@ async def cmd_start(msg: Message, state: FSMContext):
     await state.clear()
     await ensure_doctor(msg.from_user.id, msg.from_user.full_name)
     await msg.answer(
-        f"👋 Welcome, *{msg.from_user.full_name}*!\n\nChoose an action from the menu below:",
-        reply_markup=kb_main_menu(), parse_mode="Markdown"
+        f"👋 Вітаю, <b>{_h(msg.from_user.full_name)}</b>!\n\nОберіть дію в меню нижче:",
+        reply_markup=kb_main_menu(), parse_mode="HTML"
     )
 
 
 @router.callback_query(F.data == "menu:main")
 async def cb_main_menu(cb: CallbackQuery, state: FSMContext):
     await state.clear()
-    await cb.message.edit_text("📋 *Main Menu*\n\nChoose an action:",
-                               reply_markup=kb_main_menu(), parse_mode="Markdown")
+    await cb.message.edit_text("📋 <b>Головне меню</b>\n\nОберіть дію:",
+                               reply_markup=kb_main_menu(), parse_mode="HTML")
     await cb.answer()
 
 
@@ -312,46 +232,59 @@ async def cb_main_menu(cb: CallbackQuery, state: FSMContext):
 @router.message(Command("newtest"))
 async def cmd_newtest(event, state: FSMContext):
     await state.set_state(NewTest.choosing_test)
-    text = "📋 *Select a test for the patient:*"
+    text = "📋 <b>Оберіть тест для пацієнта:</b>"
     markup = kb_test_selection()
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
+        await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await event.answer()
     else:
-        await event.answer(text, reply_markup=markup, parse_mode="Markdown")
+        await event.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("test:"), NewTest.choosing_test)
 async def cb_test_selected(cb: CallbackQuery, state: FSMContext):
     test_type = cb.data.split(":")[1]
     if test_type not in TESTS:
-        await cb.answer("Unknown test", show_alert=True)
+        await cb.answer("Невідомий тест", show_alert=True)
         return
     await state.update_data(test_type=test_type)
     await state.set_state(NewTest.entering_name)
     await cb.message.edit_text(
-        f"✅ Selected: *{TESTS[test_type]['name']}*\n\n"
-        "👤 Enter the *patient's full name*:",
-        parse_mode="Markdown"
+        f"✅ Обрано: <b>{_h(TESTS[test_type]['name'])}</b>\n\n"
+        "👤 Введіть <b>ПІБ пацієнта</b>:",
+        parse_mode="HTML"
     )
     await cb.answer()
 
 
+import html as _htmlmod
+
+
+def _h(v) -> str:
+    return _htmlmod.escape(str(v if v is not None else '—'), quote=False)
+
+
+async def _owns(cb, result) -> bool:
+    pool = await get_db()
+    row = await pool.fetchrow("SELECT telegram_id FROM doctors WHERE id = $1", result['doctor_id'])
+    return bool(row) and row['telegram_id'] == cb.from_user.id
+
+
 @router.message(NewTest.entering_name)
 async def handle_patient_name(msg: Message, state: FSMContext):
-    name = msg.text.strip()
-    if len(name.split()) < 2:
-        await msg.answer("⚠️ Please enter at least first and last name. Try again:")
+    name = (msg.text or '').strip()
+    if len(name.split()) < 2 or len(name) > 120:
+        await msg.answer("⚠️ Вкажіть щонайменше ім'я та прізвище (до 120 символів). Спробуйте ще раз:")
         return
     data = await state.get_data()
     await state.update_data(patient_name=name)
     await state.set_state(NewTest.confirming)
     await msg.answer(
-        f"📝 *Confirm details:*\n\n"
-        f"👤 Patient: *{name}*\n"
-        f"🧪 Test: *{TESTS[data['test_type']]['name']}*\n\n"
-        "Is this correct?",
-        reply_markup=kb_confirm(), parse_mode="Markdown"
+        f"📝 <b>Перевірте дані:</b>\n\n"
+        f"👤 Пацієнт: <b>{_h(name)}</b>\n"
+        f"🧪 Тест: <b>{_h(TESTS[data['test_type']]['name'])}</b>\n\n"
+        "Все вірно?",
+        reply_markup=kb_confirm(), parse_mode="HTML"
     )
 
 
@@ -360,21 +293,21 @@ async def cb_confirm(cb: CallbackQuery, state: FSMContext):
     action = cb.data.split(":")[1]
     if action == "cancel":
         await state.clear()
-        await cb.message.edit_text("❌ Cancelled.", reply_markup=kb_main_menu())
+        await cb.message.edit_text("❌ Скасовано.", reply_markup=kb_main_menu())
         await cb.answer()
         return
     if action == "rename":
         await state.set_state(NewTest.entering_name)
         data = await state.get_data()
         await cb.message.edit_text(
-            f"✅ Selected: *{TESTS[data['test_type']]['name']}*\n\n"
-            "👤 Enter patient's full name again:",
-            parse_mode="Markdown"
+            f"✅ Обрано: <b>{_h(TESTS[data['test_type']]['name'])}</b>\n\n"
+            "👤 Введіть ПІБ пацієнта ще раз:",
+            parse_mode="HTML"
         )
         await cb.answer()
         return
 
-    await cb.message.edit_text("⏳ Generating QR code...")
+    await cb.message.edit_text("⏳ Створюю QR-код...")
     await cb.answer()
     data = await state.get_data()
 
@@ -388,19 +321,19 @@ async def cb_confirm(cb: CallbackQuery, state: FSMContext):
         await cb.message.answer_photo(
             photo=qr_file,
             caption=(
-                f"✅ *QR code ready!*\n\n"
-                f"👤 Patient: *{data['patient_name']}*\n"
-                f"🧪 Test: *{TESTS[data['test_type']]['name']}*\n\n"
-                f"📱 Share the link or show the QR:\n"
-                f"`{test_url}`\n\n"
-                f"⚠️ _Single-use link — expires after completion_"
+                f"✅ <b>QR-код готовий!</b>\n\n"
+                f"👤 Пацієнт: <b>{_h(data['patient_name'])}</b>\n"
+                f"🧪 Тест: <b>{_h(TESTS[data['test_type']]['name'])}</b>\n\n"
+                f"📱 Надішліть посилання або покажіть QR:\n"
+                f"<code>{_h(test_url)}</code>\n\n"
+                f"⚠️ <i>Одноразове посилання: діє до завершення тесту</i>"
             ),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         await cb.message.delete()
     except Exception as e:
         log.error(f"Session creation error: {e}", exc_info=True)
-        await cb.message.edit_text("❌ Error occurred. Please try again.", reply_markup=kb_main_menu())
+        await cb.message.edit_text("❌ Сталася помилка. Спробуйте ще раз.", reply_markup=kb_main_menu())
         if ADMIN_TG_ID:
             await bot.send_message(ADMIN_TG_ID, f"🚨 /newtest error\nDoctor: {cb.from_user.id}\n{e}")
     finally:
@@ -415,7 +348,7 @@ async def cmd_sessions(event, state: FSMContext):
     pool = await get_db()
     doctor = await pool.fetchrow("SELECT id FROM doctors WHERE telegram_id = $1", user_id)
     if not doctor:
-        text = "❌ Error: doctor not found"
+        text = "❌ Помилка: лікаря не знайдено"
         if isinstance(event, CallbackQuery):
             await event.message.edit_text(text)
             await event.answer()
@@ -425,22 +358,21 @@ async def cmd_sessions(event, state: FSMContext):
 
     rows = await get_doctor_sessions(doctor['id'], status='pending')
     if not rows:
-        text = "📭 No active sessions.\n\nCreate a new test from the menu."
-        markup = kb_main_menu()
+        text = "📭 Активних сесій немає.\n\nСтворіть новий тест у меню."
     else:
-        text = "📋 *Active sessions (test not yet completed):*\n\n"
+        text = "📋 <b>Активні сесії (тест ще не завершено):</b>\n\n"
         for r in rows:
             test_name = TESTS.get(r["test_type"], {}).get("name", r["test_type"])
             created   = r["created_at"].strftime("%d.%m %H:%M")
-            text += f"• *{r['patient_name']}* — {test_name}\n"
-            text += f"  `{str(r['token'])[:8]}...` · {created}\n\n"
-        markup = kb_main_menu()
+            text += f"• <b>{_h(r['patient_name'])}</b> — {_h(test_name)}\n"
+            text += f"  <code>{_h(str(r['token'])[:8])}...</code> · {created}\n\n"
+    markup = kb_main_menu()
 
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
+        await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await event.answer()
     else:
-        await event.answer(text, reply_markup=markup, parse_mode="Markdown")
+        await event.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "menu:completed")
@@ -449,28 +381,27 @@ async def cmd_completed(cb: CallbackQuery, state: FSMContext):
     pool = await get_db()
     doctor = await pool.fetchrow("SELECT id FROM doctors WHERE telegram_id = $1", cb.from_user.id)
     if not doctor:
-        await cb.message.edit_text("❌ Error: doctor not found")
+        await cb.message.edit_text("❌ Помилка: лікаря не знайдено")
         await cb.answer()
         return
 
     rows = await get_doctor_sessions(doctor['id'], status='completed')
     if not rows:
-        await cb.message.edit_text("📭 No completed tests yet.", reply_markup=kb_main_menu())
+        await cb.message.edit_text("📭 Завершених тестів ще немає.", reply_markup=kb_main_menu())
         await cb.answer()
         return
 
-    sev_emoji = {"low": "🟢", "moderate": "🟡", "high": "🟠", "severe": "🔴"}
     buttons = [
         [InlineKeyboardButton(
-            text=f"{sev_emoji.get(r.get('severity'), '⚪')} {r['patient_name']} — {TESTS.get(r['test_type'], {}).get('name', r['test_type'])} ({r['created_at'].strftime('%d.%m')})",
+            text=f"{r['patient_name']} — {TESTS.get(r['test_type'], {}).get('name', r['test_type'])} ({r['created_at'].strftime('%d.%m')})",
             callback_data=f"view:{r['token']}"
         )]
         for r in rows
     ]
-    buttons.append([InlineKeyboardButton(text="◀️ Back", callback_data="menu:main")])
-    await cb.message.edit_text("✅ *Completed tests:*\n",
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="menu:main")])
+    await cb.message.edit_text("✅ <b>Завершені тести:</b>\n",
                                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-                               parse_mode="Markdown")
+                               parse_mode="HTML")
     await cb.answer()
 
 
@@ -479,47 +410,58 @@ async def cb_view_result(cb: CallbackQuery):
     token  = cb.data.split(":")[1]
     result = await get_result(token)
     if not result:
-        await cb.answer("❌ Result not found", show_alert=True)
+        await cb.answer("❌ Результат не знайдено", show_alert=True)
+        return
+    if not await _owns(cb, result):
+        await cb.answer("⛔ Немає доступу", show_alert=True)
         return
 
-    sev_labels = {
-        'low': 'Minimal / Normal', 'moderate': 'Mild / Sub-norm',
-        'high': 'Moderate / Deviation', 'severe': 'Severe / Pronounced'
-    }
-    test_name = TESTS.get(result['test_type'], {}).get('name', result['test_type'])
-    text = (
-        f"📊 *Test Result*\n\n"
-        f"👤 Patient: *{result['patient_name']}*\n"
-        f"🧪 Test: {test_name}\n"
-        f"📅 Date: {result['completed_at'].strftime('%d.%m.%Y %H:%M')}\n\n"
-        f"📈 Total score: *{result['score']}*\n"
-        f"🎯 Level: *{sev_labels.get(result['severity'], result['severity'])}*"
-    )
-    await cb.message.edit_text(text, reply_markup=kb_session_item(token), parse_mode="Markdown")
+    import html as _html
+    esc = lambda v: _html.escape(str(v if v is not None else '—'), quote=False)
+    yn = lambda b: 'так' if b else 'ні'
+    r = dict(result)
+    d = parse_details(r.get('details'))
+    cl = d.get('clusters')
+    test_name = TESTS.get(r['test_type'], {}).get('name', r['test_type'])
+    lines = ["📊 <b>Результат тесту</b>", "",
+             f"👤 Пацієнт: <b>{esc(r['patient_name'])}</b>",
+             f"🧪 Тест: {esc(test_name)}",
+             f"📅 Дата: {r['completed_at'].strftime('%d.%m.%Y %H:%M')}", ""]
+    if r['test_type'] == 'pcl5' and cl:
+        lines += [f"📈 Сума: <b>{esc(r['score'])}</b> з 80",
+                  f"B: {cl['B']}/20 · C: {cl['C']}/8 · D: {cl['D']}/28 · E: {cl['E']}/24",
+                  f"Поріг 31–33: {yn(d.get('cutoff_met'))}; DSM-5 (попередньо): {yn(d.get('dsm_provisional'))}"]
+    else:
+        lines += [f"📈 Бал: <b>{esc(r['score'])}</b>", "Інтерпретація потребує фахівця."]
+    text = "\n".join(lines)
+    await cb.message.edit_text(text, reply_markup=kb_session_item(token), parse_mode="HTML")
     await cb.answer()
 
 
 @router.callback_query(F.data.startswith("pdf:"))
 async def cb_download_pdf(cb: CallbackQuery):
-    await cb.answer("📄 Generating PDF...")
+    await cb.answer("📄 Формую PDF...")
     token  = cb.data.split(":")[1]
     result = await get_result(token)
     if not result:
-        await cb.answer("❌ Result not found", show_alert=True)
+        await cb.answer("❌ Результат не знайдено", show_alert=True)
+        return
+    if not await _owns(cb, result):
+        await cb.answer("⛔ Немає доступу", show_alert=True)
         return
     try:
-        pdf_buffer = generate_pdf_report(dict(result))
+        pdf_buffer = generate_pdf_report({**dict(result), 'test_name': TESTS.get(result['test_type'], {}).get('name', result['test_type'])})
         test_name   = TESTS.get(result['test_type'], {}).get('name', result['test_type']).replace(' ', '_')
         patient_name = result['patient_name'].replace(' ', '_')
         filename    = f"Report_{patient_name}_{test_name}_{datetime.now().strftime('%d%m%Y')}.pdf"
         await bot.send_document(
             cb.from_user.id,
             document=BufferedInputFile(pdf_buffer.read(), filename=filename),
-            caption=f"📄 Report: {result['patient_name']} — {test_name}"
+            caption=f"📄 Звіт: {result['patient_name']} — {test_name}"
         )
     except Exception as e:
         log.error(f"PDF error: {e}", exc_info=True)
-        await cb.answer("❌ PDF generation failed", show_alert=True)
+        await cb.answer("❌ Не вдалося сформувати PDF", show_alert=True)
 
 
 @router.callback_query(F.data == "menu:help")
@@ -527,35 +469,48 @@ async def cb_download_pdf(cb: CallbackQuery):
 async def cmd_help(event, state: FSMContext):
     await state.clear()
     text = (
-        "📖 *Help*\n\n"
-        "*Commands:*\n"
-        "• /start — main menu\n"
-        "• /newtest — create new test\n"
-        "• /sessions — active sessions\n"
-        "• /help — this help\n\n"
-        "*How it works:*\n"
-        "1️⃣ Create a test for the patient\n"
-        "2️⃣ Select the test methodology\n"
-        "3️⃣ Enter the patient's full name\n"
-        "4️⃣ Get a QR code or link\n"
-        "5️⃣ Patient completes the test\n"
-        "6️⃣ You receive the result automatically\n"
-        "7️⃣ View details and download PDF reports"
+        "📖 <b>Допомога</b>\n\n"
+        "<b>Команди:</b>\n"
+        "• /start — головне меню\n"
+        "• /newtest — створити тест\n"
+        "• /sessions — активні сесії\n"
+        "• /help — ця довідка\n\n"
+        "<b>Як це працює:</b>\n"
+        "1️⃣ Створіть тест для пацієнта\n"
+        "2️⃣ Оберіть методику\n"
+        "3️⃣ Введіть ПІБ пацієнта\n"
+        "4️⃣ Отримайте QR-код або посилання\n"
+        "5️⃣ Пацієнт проходить тест\n"
+        "6️⃣ Результат надходить автоматично\n"
+        "7️⃣ Перегляньте деталі та завантажте PDF"
     )
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=kb_main_menu(), parse_mode="Markdown")
+        await event.message.edit_text(text, reply_markup=kb_main_menu(), parse_mode="HTML")
         await event.answer()
     else:
-        await event.answer(text, reply_markup=kb_main_menu(), parse_mode="Markdown")
+        await event.answer(text, reply_markup=kb_main_menu(), parse_mode="HTML")
 
 
 # ── Webhook (receives results from n8n) ──────────────────────
 
 async def handle_result_webhook(request):
+    import html as _html
+
+    def esc(value, limit=200):
+        # Everything shown in the doctor's message is escaped for parse_mode="HTML".
+        text = str(value if value is not None else '—')[:limit]
+        return _html.escape(text, quote=False)
+
     try:
-        data = await request.json()
+        try:
+            data = await request.json()
+        except ValueError:
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+        if not isinstance(data, dict):
+            return web.json_response({'error': 'Invalid body'}, status=400)
+
         token = data.get('session_token')
-        if not token:
+        if not isinstance(token, str) or not token:
             return web.json_response({'error': 'Missing session_token'}, status=400)
 
         session = await get_session(token)
@@ -567,52 +522,66 @@ async def handle_result_webhook(request):
         if not doctor:
             return web.json_response({'error': 'Doctor not found'}, status=404)
 
-        test_name    = TESTS.get(data.get('test_type', ''), {}).get('name', data.get('test_type', ''))
-        patient_name = data.get('patient_name', session['full_name'])
+        test_type    = str(data.get('test_type', ''))[:50]
+        test_name    = TESTS.get(test_type, {}).get('name', test_type)
+        # The patient name comes from the server-side session, not from the request body.
+        patient_name = session['full_name'] or '—'
         score        = data.get('score', '—')
-        severity     = data.get('severity_ua', data.get('severity', '—'))
-        sev_emoji    = {"low": "🟢", "moderate": "🟡", "high": "🟠", "severe": "🔴"}.get(data.get('severity', ''), '⚪')
+        severity     = data.get('severity_ua') or '—'
+        sev_emoji    = '🟠' if data.get('ptsd_probable') else '⚪'
 
         message = (
-            f"{sev_emoji} *Test completed!*\n\n"
-            f"👤 Patient: *{patient_name}*\n"
-            f"🧪 Test: {test_name}\n"
-            f"📈 Score: *{score}*\n"
-            f"🎯 Level: *{severity}*\n\n"
-            f"Use the buttons below to view results or download a PDF report."
+            f"{sev_emoji} <b>Тест завершено</b>\n\n"
+            f"👤 Пацієнт: <b>{esc(patient_name)}</b>\n"
+            f"🧪 Тест: {esc(test_name)}\n"
+            f"📈 Бал: <b>{esc(score, 20)}</b>\n"
+            f"🎯 Підсумок: <b>{esc(severity, 300)}</b>\n\n"
+            f"Кнопками нижче можна переглянути результат або завантажити PDF."
         )
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📊 View result",   callback_data=f"view:{token}")],
-            [InlineKeyboardButton(text="📥 Download PDF",  callback_data=f"pdf:{token}")],
+            [InlineKeyboardButton(text="📊 Переглянути результат",   callback_data=f"view:{token}")],
+            [InlineKeyboardButton(text="📥 Завантажити PDF",  callback_data=f"pdf:{token}")],
         ])
-        await bot.send_message(doctor['telegram_id'], message, parse_mode="Markdown", reply_markup=markup)
+        await bot.send_message(doctor['telegram_id'], message, parse_mode="HTML", reply_markup=markup)
         log.info(f"Result notification sent to doctor {doctor['telegram_id']} for token {token}")
         return web.json_response({'status': 'ok'})
 
     except Exception as e:
         log.error(f"Webhook error: {e}", exc_info=True)
-        return web.json_response({'error': str(e)}, status=500)
+        return web.json_response({'error': 'internal error'}, status=500)
 
 
-# ── Startup / Shutdown ───────────────────────────────────────
+# -- Startup / Shutdown --
 
 async def setup_bot_menu():
     commands = [
-        BotCommand(command="start",    description="🏠 Main menu"),
-        BotCommand(command="newtest",  description="➕ Create new test"),
-        BotCommand(command="sessions", description="📋 Active sessions"),
-        BotCommand(command="help",     description="❓ Help"),
+        BotCommand(command="start",    description="🏠 Головне меню"),
+        BotCommand(command="newtest",  description="➕ Створити тест"),
+        BotCommand(command="sessions", description="📋 Активні сесії"),
+        BotCommand(command="help",     description="❓ Допомога"),
     ]
     await bot.set_my_commands(commands)
     await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 
+@web.middleware
+async def require_secret(request, handler):
+    import hmac
+    got = request.headers.get("X-Webhook-Secret", "")
+    if not hmac.compare_digest(got.encode(), WEBHOOK_SECRET.encode()):
+        log.warning(f"Rejected /result from {request.remote}")
+        return web.json_response({"error": "unauthorized"}, status=401)
+    return await handler(request)
+
+
 async def main():
-    app = web.Application()
+    if not WEBHOOK_SECRET:
+        raise SystemExit("WEBHOOK_SECRET is required")
+    app = web.Application(middlewares=[require_secret])
     app.router.add_post(WEBHOOK_PATH, handle_result_webhook)
     runner = web.AppRunner(app)
     await runner.setup()
-    await web.TCPSite(runner, '0.0.0.0', WEBHOOK_PORT).start()
+    await web.TCPSite(runner, WEBHOOK_HOST, WEBHOOK_PORT).start()
 
     await get_db()
     await setup_bot_menu()

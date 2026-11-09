@@ -1,0 +1,6 @@
+*.bak
+*.bak-*
+content/
+.env
+patch_*.py
+venv/
