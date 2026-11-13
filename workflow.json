@@ -1,23 +1,28 @@
 {
-  "name": "Психодіагностика — Головний Workflow",
+  "name": "Психодіагностика — Головний Workflow v4",
+  "description": null,
   "nodes": [
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT \n  t.token,\n  t.full_name AS patient_name,\n  t.test_type,\n  t.test_version,\n  t.status,\n  d.telegram_id AS doctor_telegram_id\nFROM tokens t\nLEFT JOIN doctors d ON d.id = t.doctor_id\nWHERE t.token = '{{ $json.query.token }}'\nLIMIT 1",
-        "options": {}
+        "query": "SELECT t.token, t.full_name AS patient_name, t.test_type, t.test_version, t.status, t.sex\nFROM tokens t\nWHERE t.token = $1\n  AND (t.expires_at IS NULL OR t.expires_at > NOW())\nLIMIT 1",
+        "options": {
+          "queryReplacement": "={{ $json.query.token }}"
+        }
       },
-      "id": "1efbe441-2816-46e6-b2c3-207f40b96576",
+      "id": "d72495fa-a261-41b1-ba50-dfa60167c15d",
       "name": "DB: Get Session1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -448,
-        2064
+        6240,
+        2448
       ],
+      "alwaysOutputData": true,
+      "executeOnce": false,
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -26,28 +31,34 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.length }}",
-              "rightValue": 0,
+              "id": "sf-1",
+              "leftValue": "={{ $json.token }}",
+              "rightValue": "",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
               }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "id": "6cac0a46-6a62-4585-935f-923594fb08d6",
+      "id": "68a91cd9-832d-4e1f-a94e-4c03ccabe7d1",
       "name": "Session Found?1",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        -224,
-        2064
+        6464,
+        2448
       ]
     },
     {
@@ -57,13 +68,13 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "cdea5016-84ef-4962-8b43-9012c1d24e82",
+      "id": "a556e11c-b912-4fc7-9981-22183681d615",
       "name": "POST /psychotest1",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -656,
-        2448
+        6032,
+        2832
       ],
       "webhookId": "241acb79-487b-45fe-9972-d6ca100c0dfb"
     },
@@ -109,13 +120,13 @@
         },
         "options": {}
       },
-      "id": "2e882ddc-1ad1-4fea-a87d-94be35f7a5c3",
+      "id": "cee40094-13f3-4134-8f3d-82bd16734c21",
       "name": "Validate Input1",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -448,
-        2448
+        6240,
+        2832
       ]
     },
     {
@@ -126,38 +137,47 @@
           "responseCode": 400
         }
       },
-      "id": "091f2380-afb4-4942-b223-7030756b32be",
+      "id": "f1475c6c-d94c-460e-9027-816e726d9575",
       "name": "Respond: ",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        -224,
-        2704
+        6464,
+        3088
       ]
     },
     {
       "parameters": {
         "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
           "conditions": [
             {
-              "leftValue": "={{ $json[0]?.status }}",
-              "rightValue": "pending",
+              "id": "sp-claimed",
+              "leftValue": "={{ $json.token }}",
+              "rightValue": "",
               "operator": {
                 "type": "string",
-                "operation": "equal"
+                "operation": "notEmpty",
+                "singleValue": true
               }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "id": "d4dcb071-6074-42c9-a274-1e15fd56102e",
+      "id": "bd7ea81e-3273-467a-8163-6e9d7f62d1fd",
       "name": "Session Pending?1",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        0,
-        2448
+        6688,
+        2832
       ]
     },
     {
@@ -168,34 +188,34 @@
           "responseCode": 409
         }
       },
-      "id": "a2d35032-6d4e-424e-8cdd-1dcf9228173e",
+      "id": "6f2557e1-bd56-4ff6-acf3-85671d1a9ee6",
       "name": "Respond: 409 Already Used1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        224,
-        2672
+        6912,
+        3056
       ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE tokens \nSET status = 'completed', used_at = NOW() \nWHERE token = $1",
+        "query": "UPDATE tokens\nSET status = 'completed', used_at = NOW()\nWHERE token = $1 AND status = 'processing'",
         "options": {
-          "queryReplacement": "={{ $('Validate Input1').item.json.body.session_token }}"
+          "queryReplacement": "={{ $('Validate Input1').first().json.body.session_token }}"
         }
       },
-      "id": "01d5a704-2a13-4c46-8221-fb0e2f290e96",
+      "id": "bd0e6569-4503-4c33-bea6-6792f27c1f8a",
       "name": "DB: Mark Session Completed1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        224,
-        2448
+        6912,
+        2832
       ],
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -208,48 +228,48 @@
           "responseCode": 200
         }
       },
-      "id": "b77be711-c797-4d64-9089-5f790983750a",
+      "id": "f1f24698-367a-4065-b497-961bbfd99dee",
       "name": "Respond: 200 OK1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        448,
-        2288
+        7136,
+        2672
       ]
     },
     {
       "parameters": {
-        "jsCode": "const start = Date.now();\nconst body = $('Validate Input1').item.json.body;\n\nconst test_type = body.test_type || '';\nconst patient   = body.patient_name || 'Невідомий';\n\n// ── Нормалізація відповідей ──────────────────────────────────────────────────\nlet raw = body.answers || [];\nlet answers;\nif (!Array.isArray(raw) && typeof raw === 'object') {\n  answers = Object.keys(raw).sort((a,b)=>parseInt(a)-parseInt(b)).map(k=>parseInt(raw[k])||0);\n} else {\n  answers = raw.map(a=>parseInt(a)||0);\n}\n\nfunction resolveType(declared, ans) {\n  if (['pcl5','minmult','schmishek'].includes(declared)) return declared;\n  if (ans.length <= 20) return 'pcl5';\n  if (ans.length <= 71) return 'minmult';\n  return 'schmishek';\n}\nconst resolved_type = resolveType(test_type, answers);\n\n// ── PCL-5 (20 питань, шкала 0-4) ────────────────────────────────────────────\n// Кластери DSM-5:\n// B (1-5)  — Вторгнення\n// C (6-7)  — Уникнення\n// D (8-14) — Негативні зміни когніцій/настрою\n// E (15-20)— Гіперзбудження\nfunction score_pcl5(ans) {\n  const a = ans.slice(0, 20);\n  const total = a.reduce((s,v)=>s+v, 0);\n  const B = a.slice(0,5).reduce((s,v)=>s+v,0);\n  const C = a.slice(5,7).reduce((s,v)=>s+v,0);\n  const D = a.slice(7,14).reduce((s,v)=>s+v,0);\n  const E = a.slice(14,20).reduce((s,v)=>s+v,0);\n  // Імовірний ПТСР: поріг ≥33 + хоча б один кластер перевищений\n  const ptsd_probable = total >= 33 && (B>=10 || C>=4 || D>=14 || E>=12);\n  let severity, severity_ua;\n  if (total <= 32)      { severity='low';      severity_ua='Мінімальний'; }\n  else if (total <= 44) { severity='moderate'; severity_ua='Легкий'; }\n  else if (total <= 56) { severity='high';     severity_ua='Помірний'; }\n  else                  { severity='severe';   severity_ua='Важкий'; }\n  return {\n    total, severity, severity_ua, ptsd_probable,\n    subscales: {\n      'B_Вторгнення': B,\n      'C_Уникнення': C,\n      'D_Когніції': D,\n      'E_Збудження': E\n    }\n  };\n}\n\n// ── Міні-Мульт — 71 питання, власний опитувальник ───────────────────────────\n// Питання згруповані по психопатологічних темах.\n// Ключі (1-based) складені на основі змісту питань з документу.\n// \"yes\" = відповідь \"Так\" (1) додає бал до шкали\n// \"no\"  = відповідь \"Ні\"  (0) додає бал до шкали\nconst MM_SCALES = {\n  'Іпохондрія_Hs': {\n    yes: [2,3,6,21,22,28,32,39,45,46,64,65],\n    no:  [30,50,59,61]\n  },\n  'Депресія_D': {\n    yes: [11,15,18,19,22,24,33,34,36,37,41,54,56,57,58,63,64,67,70],\n    no:  [5,49,59,62]\n  },\n  'Істерія_Hy': {\n    yes: [2,3,6,7,14,21,22,28,32,39,45,46,65],\n    no:  [17,19,26,29,38,51]\n  },\n  'Психопатія_Pd': {\n    yes: [10,13,16,18,23,24,26,33,43,55,56,63,67],\n    no:  [9,17,29,42,50,57,62]\n  },\n  'Параноя_Pa': {\n    yes: [10,12,13,14,20,26,36,37,41,43,57,63,67,68],\n    no:  [25,38,51,52,59]\n  },\n  'Психастенія_Pt': {\n    yes: [2,3,7,15,19,22,24,37,38,41,47,54,56,58,63,67,70],\n    no:  [30,59,62]\n  },\n  'Шизофренія_Sc': {\n    yes: [7,8,20,24,26,27,33,36,37,41,43,44,46,47,53,54,56,63,65,67,70],\n    no:  [17,29,38,49,50,52,59,62]\n  },\n  'Гіпоманія_Ma': {\n    yes: [4,5,16,23,26,42,43,51,53,55,58,64,67],\n    no:  [9,36,50,57,62]\n  },\n  'Соціальна_інтроверсія_Si': {\n    yes: [8,25,40,52,53,68],\n    no:  [4,14,16,17,28,49,55,64,66]\n  },\n};\n\nfunction score_minmult(ans) {\n  const a = ans.slice(0, 71);\n  const scales = {};\n  for (const [scale, keys] of Object.entries(MM_SCALES)) {\n    let s = 0;\n    for (const k of keys.yes) { if (k<=a.length && a[k-1]===1) s++; }\n    for (const k of keys.no)  { if (k<=a.length && a[k-1]===0) s++; }\n    scales[scale] = s;\n  }\n  const clinical_names = Object.keys(MM_SCALES);\n  const values = clinical_names.map(n=>scales[n]);\n  const maxVal = Math.max(...values);\n  const total  = values.reduce((s,v)=>s+v, 0);\n  const peak_scale = clinical_names[values.indexOf(maxVal)];\n\n  // Шкали достовірності\n  const L = [6,9,15,17,29,30,35,50,59,62].filter(k=>k<=a.length&&a[k-1]===1).length;\n  const F = [7,10,13,14,20,23,24,26,27,31,33,36,37,41,43,44,46,47,51,53,54,55,56,58,63,65,67,70].filter(k=>k<=a.length&&a[k-1]===1).length;\n  const K = [9,26,30,57,62].filter(k=>k<=a.length&&a[k-1]===1).length +\n            [8,19,21,22,25,38,40,42,50,52,59,68].filter(k=>k<=a.length&&a[k-1]===0).length;\n\n  let severity, severity_ua;\n  if (maxVal <= 4)       { severity='low';      severity_ua='В нормі'; }\n  else if (maxVal <= 7)  { severity='moderate'; severity_ua='Субнорма'; }\n  else if (maxVal <= 10) { severity='high';     severity_ua='Відхилення'; }\n  else                   { severity='severe';   severity_ua='Виражений'; }\n\n  return {\n    total, severity, severity_ua, peak_scale,\n    subscales: scales,\n    validity: { L, F, K },\n    elevated_scales: clinical_names.filter(n=>scales[n]>=8)\n  };\n}\n\n// ── Шмішек — 88 питань, 10 шкал акцентуацій (Леонгард) ─────────────────────\n// Ключі прив'язані до змісту власних питань з документу\nconst SCH_SCALES = {\n  'Гіпертимія': {\n    yes: [7,11,36,50],\n    no:  [30,58]\n  },\n  'Дистимія': {\n    yes: [15,38,46,55,64,71],\n    no:  [1,14,28,48]\n  },\n  'Циклотимія': {\n    yes: [3,16,72,76],\n    no:  []\n  },\n  'Збудливість': {\n    yes: [10,33,52,75,79,83],\n    no:  []\n  },\n  'Застрягання': {\n    yes: [21,31,56,69,73],\n    no:  [2,27,47]\n  },\n  'Педантизм': {\n    yes: [13,17,29,34,41,43],\n    no:  [36]\n  },\n  'Тривожність': {\n    yes: [5,11,26,38,54,60],\n    no:  [1,6]\n  },\n  'Емотивність': {\n    yes: [3,15,37,45,68,78],\n    no:  [58]\n  },\n  'Демонстративність': {\n    yes: [4,18,24,28,40,64,66,80,85],\n    no:  [51]\n  },\n  'Екзальтованість': {\n    yes: [7,36,57,72,77,82,86],\n    no:  []\n  },\n};\n\nfunction score_schmishek(ans) {\n  const a = ans.slice(0, 88);\n  const scales = {};\n  for (const [scale, keys] of Object.entries(SCH_SCALES)) {\n    let s = 0;\n    for (const k of keys.yes) { if (k<=a.length && a[k-1]===1) s++; }\n    for (const k of keys.no)  { if (k<=a.length && a[k-1]===0) s++; }\n    // Нормування до 24 балів (як в оригінальному Шмішеку)\n    const max_keys = (keys.yes.length + keys.no.length);\n    scales[scale] = max_keys > 0 ? Math.round(s * 24 / max_keys) : 0;\n  }\n  const entries   = Object.entries(scales);\n  const peak      = entries.sort(([,a],[,b])=>b-a)[0];\n  const total     = entries.reduce((s,[,v])=>s+v, 0);\n  const accentuated = Object.entries(scales).filter(([,v])=>v>=19).map(([k])=>k);\n\n  let severity, severity_ua;\n  if (accentuated.length === 0)     { severity='low';      severity_ua='В нормі'; }\n  else if (accentuated.length <= 2) { severity='moderate'; severity_ua='Акцентуація'; }\n  else if (accentuated.length <= 4) { severity='high';     severity_ua='Виражена'; }\n  else                              { severity='severe';   severity_ua='Дуже виражена'; }\n\n  return {\n    total, severity, severity_ua,\n    subscales: Object.fromEntries(Object.entries(scales).sort(([,a],[,b])=>b-a)),\n    accentuated_types: accentuated,\n    peak_type: peak?.[0],\n    peak_score: peak?.[1]\n  };\n}\n\n// ── Запуск ───────────────────────────────────────────────────────────────────\nconst scorers    = { pcl5: score_pcl5, minmult: score_minmult, schmishek: score_schmishek };\nconst test_names = { pcl5:'PCL-5 (ПТСР)', minmult:'Міні-Мульт (MMPI)', schmishek:'Шмішек (акцентуації)' };\n\nif (!scorers[resolved_type]) throw new Error('Unknown test_type: ' + resolved_type);\n\nconst result = scorers[resolved_type](answers);\nconst scoring_time_ms = Date.now() - start;\n\nreturn [{\n  json: {\n    ...body,\n    answers,\n    test_type:        resolved_type,\n    test_name:        test_names[resolved_type],\n    score:            result.total,\n    severity:         result.severity,\n    severity_ua:      result.severity_ua,\n    subscales:        result.subscales,\n    scoring_time_ms,\n    // Поля специфічні для кожного тесту\n    ...(result.ptsd_probable     !== undefined && { ptsd_probable:     result.ptsd_probable }),\n    ...(result.peak_scale        !== undefined && { peak_scale:        result.peak_scale }),\n    ...(result.elevated_scales   !== undefined && { elevated_scales:   result.elevated_scales }),\n    ...(result.validity          !== undefined && { validity:          result.validity }),\n    ...(result.accentuated_types !== undefined && { accentuated_types: result.accentuated_types }),\n    ...(result.peak_type         !== undefined && { peak_type:         result.peak_type }),\n    ...(result.peak_score        !== undefined && { peak_score:        result.peak_score }),\n  }\n}];\n"
+        "jsCode": "const start = Date.now();\nconst body = $('Validate Input1').first().json.body;\n\nconst test_type = body.test_type || '';\nconst patient   = body.patient_name || 'Невідомий';\n\n// ── Нормалізація відповідей ──────────────────────────────────────────────────\nlet raw = body.answers || [];\nlet answers;\nif (!Array.isArray(raw) && typeof raw === 'object') {\n  answers = Object.keys(raw).sort((a,b)=>parseInt(a)-parseInt(b)).map(k=>parseInt(raw[k])||0);\n} else {\n  answers = raw.map(a=>parseInt(a)||0);\n}\n\nfunction resolveType(declared, ans) {\n  if (['pcl5','minmult','schmishek'].includes(declared)) return declared;\n  if (ans.length <= 20) return 'pcl5';\n  if (ans.length <= 71) return 'minmult';\n  return 'schmishek';\n}\nconst resolved_type = resolveType(test_type, answers);\n\n// ── PCL-5 (20 питань, шкала 0-4) ────────────────────────────────────────────\n// Кластери DSM-5:\n// B (1-5)  — Вторгнення\n// C (6-7)  — Уникнення\n// D (8-14) — Негативні зміни когніцій/настрою\n// E (15-20)— Гіперзбудження\nfunction score_pcl5(ans) {\n  if (ans.length !== 20) throw new Error('PCL-5: expected 20 answers, got ' + ans.length);\n  const a = ans.map(v => Math.min(4, Math.max(0, v)));\n  const sum = (arr) => arr.reduce((s, v) => s + v, 0);\n  const pos = (arr) => arr.filter(v => v >= 2).length;\n  const cl = { B: a.slice(0,5), C: a.slice(5,7), D: a.slice(7,14), E: a.slice(14,20) };\n  const clusters = { B: sum(cl.B), C: sum(cl.C), D: sum(cl.D), E: sum(cl.E) };\n  const total = sum(a);\n  // DSM-5 provisional: >=1 B, >=1 C, >=2 D, >=2 E при оцінці >=2 (правило за пам'яттю, не перевірено)\n  const dsm_provisional = pos(cl.B)>=1 && pos(cl.C)>=1 && pos(cl.D)>=2 && pos(cl.E)>=2;\n  const cutoff_met = total >= 33; // діапазон порога 31–33 (не перевірено)\n  return {\n    total,\n    severity: 'pending',\n    severity_ua: `Сума ${total}/80; поріг 31–33: ${cutoff_met ? 'досягнуто' : 'не досягнуто'}; DSM-5 (попередньо): ${dsm_provisional ? 'так' : 'ні'}`,\n    ptsd_probable: dsm_provisional || cutoff_met,\n    details: { clusters, dsm_provisional, cutoff_met },\n    subscales: {\n      'B_Вторгнення': clusters.B, 'C_Уникнення': clusters.C,\n      'D_Когніції/настрій': clusters.D, 'E_Збудження': clusters.E,\n    },\n  };\n}\n\n// ── Міні-Мульт (Kincannon 1968; Зайцев 1981) — 71 питання, відповіді Так(1)/Ні(0) ──\n// УВАГА: ключ взято з методички (gosuslugi PDF), НЕ верифіковано за Козюля В.Г. (1994).\n// Відомі підозрілі місця: шкала D (номер 11 і в \"Ні\", і в \"Так\"), шкала F.\n// Нумерація питань має збігатися з версією тексту, до якої складено ключ (пп. 26-27 розходяться між джерелами).\n// Т-бали потребують профільних листів (Козюля) — тут не розраховуються.\nconst MM_KEY = {\n  L:  { no: [8,11,24,47,53], yes: [] },\n  F:  { no: [22,24,61], yes: [9,12,15,19,30,38,48,49,58,59,64,71] },\n  K:  { no: [11,23,31,33,34,36,40,41,43,51,56,61,65,67,69,70], yes: [] },\n  'Hs_1_Іпохондрія':   { no: [1,2,6,37,48], yes: [9,18,26,32,44,46,55,62,63] },\n  'D_2_Депресія':      { no: [1,3,6,11,28,37,40,42,60,65,71], yes: [9,13,18,22,25,36,44] },\n  'Hy_3_Істерія':      { no: [1,2,3,11,23,28,29,31,33,35,37,40,41,43,45,50,56], yes: [9,13,18,26,44,46,55,57,62] },\n  'Pd_4_Психопатія':   { no: [3,28,34,35,41,43,50,65], yes: [7,10,13,14,15,16,22,27,52,58,71] },\n  'Pa_6_Параноя':      { no: [28,29,31,67], yes: [5,8,10,15,30,39,63,64,66,68] },\n  'Pt_7_Психастенія':  { no: [2,3,42], yes: [5,8,13,17,22,25,27,36,44,51,57,66,68] },\n  'Sc_8_Шизоїдність':  { no: [3,42], yes: [5,7,8,10,13,14,15,16,17,30,38,39,46,57,63,64,66] },\n  'Ma_9_Гіпоманія':    { no: [43], yes: [4,7,8,21,29,34,38,39,54,57,60] },\n};\n// Поправка на K: частка K, що додається до шкали\nconst MM_K_COEF = { 'Hs_1_Іпохондрія': 0.5, 'Pd_4_Психопатія': 0.4, 'Pt_7_Психастенія': 1.0, 'Sc_8_Шизоїдність': 1.0, 'Ma_9_Гіпоманія': 0.2 };\n\nfunction score_minmult(ans) {\n  if (ans.length !== 71) throw new Error('Mini-Mult: expected 71 answers, got ' + ans.length);\n  const a = ans.slice(0, 71);\n  const raw = {};\n  for (const [name, key] of Object.entries(MM_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    raw[name] = s;\n  }\n  const K = raw.K;\n  const clinical = Object.keys(MM_KEY).filter(n => !['L','F','K'].includes(n));\n  const scales = {};\n  for (const n of clinical) scales[n] = raw[n] + Math.round((MM_K_COEF[n] || 0) * K);\n  const values = clinical.map(n => scales[n]);\n  const maxVal = Math.max(...values);\n  const total = values.reduce((s,v) => s+v, 0);\n  const peak_scale = clinical[values.indexOf(maxVal)];\n  return {\n    total,\n    severity: 'unknown',\n    severity_ua: 'Т-бали не розраховано (див. шкали)',\n    peak_scale,\n    subscales: scales,\n    validity: { L: raw.L, F: raw.F, K },\n    elevated_scales: []\n  };\n}\n\n// ── Шмішек — 88 питань, відповіді Так(1)/Ні(0), 10 шкал (Леонгард) ──────────────\n// Ключ і множники: стандартний ключ опитувальника (методичка gosuslugi PDF). Макс. на шкалу = 24.\nconst SCH_KEY = {\n  'Демонстративність': { yes: [7,19,22,29,41,44,63,66,73,85,88], no: [51], mult: 2 },\n  'Застрягання':       { yes: [2,15,24,34,37,56,68,78,81],       no: [12,46,59], mult: 2 },\n  'Педантизм':         { yes: [4,14,17,26,39,48,58,61,70,80,83], no: [36], mult: 2 },\n  'Збудливість':       { yes: [8,20,30,42,52,64,74,86],          no: [], mult: 3 },\n  'Гіпертимія':        { yes: [1,11,23,33,45,55,67,77],          no: [], mult: 3 },\n  'Дистимія':          { yes: [9,21,43,75,87],                   no: [31,53,65], mult: 3 },\n  'Тривожність':       { yes: [16,27,38,49,60,71,82],            no: [5], mult: 3 },\n  'Екзальтованість':   { yes: [10,32,54,76],                     no: [], mult: 6 },\n  'Емотивність':       { yes: [3,13,35,47,57,69,79],             no: [25], mult: 3 },\n  'Циклотимія':        { yes: [6,18,28,40,50,62,72,84],          no: [], mult: 3 },\n};\n// Джерела розходяться: ознака акцентуації >12 або >19 (15-19 = тенденція). Змінюйте тут.\nconst SCH_ACCENT_MIN = 20;\n\nfunction score_schmishek(ans) {\n  if (ans.length !== 88) throw new Error('Schmishek: expected 88 answers, got ' + ans.length);\n  const a = ans.slice(0, 88);\n  const scales = {};\n  for (const [name, key] of Object.entries(SCH_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    scales[name] = s * key.mult;\n  }\n  const entries = Object.entries(scales);\n  const peak = [...entries].sort(([,x],[,y]) => y - x)[0];\n  const total = entries.reduce((s,[,v]) => s+v, 0);\n  const accentuated = entries.filter(([,v]) => v >= SCH_ACCENT_MIN).map(([k]) => k);\n\n  let severity, severity_ua;\n  if (accentuated.length === 0)     { severity='low';      severity_ua='В нормі'; }\n  else if (accentuated.length <= 2) { severity='moderate'; severity_ua='Акцентуація'; }\n  else if (accentuated.length <= 4) { severity='high';     severity_ua='Виражена'; }\n  else                              { severity='severe';   severity_ua='Дуже виражена'; }\n\n  return {\n    total, severity, severity_ua,\n    subscales: Object.fromEntries([...entries].sort(([,x],[,y]) => y - x)),\n    accentuated_types: accentuated,\n    peak_type: peak?.[0],\n    peak_score: peak?.[1]\n  };\n}\n\n// ── Запуск ───────────────────────────────────────────────────────────────────\nconst scorers    = { pcl5: score_pcl5, minmult: score_minmult, schmishek: score_schmishek };\nconst test_names = { pcl5:'PCL-5 (ПТСР)', minmult:'Міні-Мульт (MMPI)', schmishek:'Шмішек (акцентуації)' };\n\nif (!scorers[resolved_type]) throw new Error('Unknown test_type: ' + resolved_type);\n\nconst result = scorers[resolved_type](answers);\nconst scoring_time_ms = Date.now() - start;\n\nreturn [{\n  json: {\n    ...body,\n    answers,\n    test_type:        resolved_type,\n    test_name:        test_names[resolved_type],\n    score:            result.total,\n    severity:         result.severity,\n    severity_ua:      result.severity_ua,\n    subscales:        result.subscales,\n    scoring_time_ms,\n    // Поля специфічні для кожного тесту\n    ...(result.ptsd_probable     !== undefined && { ptsd_probable:     result.ptsd_probable }),\n    ...(result.peak_scale        !== undefined && { peak_scale:        result.peak_scale }),\n    ...(result.elevated_scales   !== undefined && { elevated_scales:   result.elevated_scales }),\n    ...(result.validity          !== undefined && { validity:          result.validity }),\n    ...(result.accentuated_types !== undefined && { accentuated_types: result.accentuated_types }),\n    ...(result.peak_type         !== undefined && { peak_type:         result.peak_type }),\n    ...(result.peak_score        !== undefined && { peak_score:        result.peak_score }),\n    ...(result.details           !== undefined && { details:           result.details }),\n  }\n}];\n"
       },
-      "id": "e8763839-be02-418b-b4db-64a21654571d",
+      "id": "0496b72f-8b48-445d-92fa-31bbdb0344a6",
       "name": "JS: Scoring1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        2496
+        7152,
+        2880
       ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO results\n  (submission_id, token, full_name, test_type, answers,\n   score, severity, status, scoring_time_ms, n8n_execution_id)\nVALUES\n  ($1::uuid, $2, $3, $4, $5::jsonb,\n   $6, $7, 'scored', $8, $9)\nON CONFLICT (submission_id) DO UPDATE\n  SET updated_at = NOW()\nRETURNING id, token",
+        "query": "INSERT INTO results\n  (submission_id, token, full_name, test_type, answers,\n   score, severity, status, scoring_time_ms, n8n_execution_id, details)\nVALUES\n  ($1::uuid, $2, $3, $4, $5::jsonb,\n   $6, $7, 'scored', $8, $9, $10::jsonb)\nON CONFLICT (submission_id) DO UPDATE\n  SET updated_at = NOW()\nRETURNING id, token",
         "options": {
-          "queryReplacement": "={{ $('Validate Input1').item.json.body.submission_id }},{{ $('Validate Input1').item.json.body.session_token }},{{ $('Validate Input1').item.json.body.patient_name }},{{ $('Validate Input1').item.json.body.test_type }},{{ JSON.stringify($('Validate Input1').item.json.body.answers) }},{{ $('Validate Input1').item.json.body.score }},{{ $('Validate Input1').item.json.body.severity }},{{ $json.scoring_time_ms }},{{ $execution.id }}"
+          "queryReplacement": "={{ [ $('Validate Input1').first().json.body.submission_id, $('Validate Input1').first().json.body.session_token, $('DB: Check Session Status1').first().json.full_name ?? '', $json.test_type, JSON.stringify($json.answers), $json.score, $json.severity, $json.scoring_time_ms, String($execution.id), $json.details ? JSON.stringify($json.details) : null ] }}"
         }
       },
-      "id": "84fb5b08-c95d-4d29-99e3-292861c5c546",
+      "id": "430b1a83-26b3-4570-ae8d-e7ae93263444",
       "name": "DB: Save Result1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        816,
-        2400
+        7504,
+        2784
       ],
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       },
@@ -258,41 +278,49 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://78.47.110.193:8080/result",
+        "url": "http://172.19.0.1:8082/result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"session_token\": \"{{ $('Validate Input1').item.json.body.session_token }}\",\n  \"score\": {{ $('JS: Scoring1').item.json.score }},\n  \"severity\": \"{{ $('JS: Scoring1').item.json.severity }}\",\n  \"severity_ua\": \"{{ $('JS: Scoring1').item.json.severity_ua }}\",\n  \"patient_name\": \"{{ $('JS: Scoring1').item.json.patient_name }}\",\n  \"test_type\": \"{{ $('JS: Scoring1').item.json.test_type }}\",\n  \"test_name\": \"{{ $('JS: Scoring1').item.json.test_name }}\",\n  \"subscales\": {{ JSON.stringify($('JS: Scoring1').item.json.subscales ?? {}) }},\n  \"ptsd_probable\": {{ $('JS: Scoring1').item.json.ptsd_probable ?? false }},\n  \"peak_scale\": \"{{ $('JS: Scoring1').item.json.peak_scale ?? '' }}\",\n  \"peak_type\": \"{{ $('JS: Scoring1').item.json.peak_type ?? '' }}\",\n  \"accentuated_types\": {{ JSON.stringify($('JS: Scoring1').item.json.accentuated_types ?? []) }},\n  \"ai_interpretation\": \"{{ $json.ai_interpretation ?? '' }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  session_token: $('Validate Input1').first().json.body.session_token,\n  score: $('JS: Scoring1').first().json.score,\n  severity: $('JS: Scoring1').first().json.severity,\n  severity_ua: $('JS: Scoring1').first().json.severity_ua,\n  patient_name: $('JS: Scoring1').first().json.patient_name,\n  test_type: $('JS: Scoring1').first().json.test_type,\n  test_name: $('JS: Scoring1').first().json.test_name,\n  subscales: $('JS: Scoring1').first().json.subscales ?? {},\n  ptsd_probable: $('JS: Scoring1').first().json.ptsd_probable ?? false,\n  peak_scale: $('JS: Scoring1').first().json.peak_scale ?? '',\n  peak_type: $('JS: Scoring1').first().json.peak_type ?? '',\n  accentuated_types: $('JS: Scoring1').first().json.accentuated_types ?? [],\n  details: $('JS: Scoring1').first().json.details ?? {},\n  ai_interpretation: ''\n}) }}",
         "options": {}
       },
-      "id": "b8e1b629-0667-47da-a6de-db0f09910079",
+      "id": "34822195-c313-46b5-a3f1-2aeb190a0964",
       "name": "HTTP: Notify Doctor1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1760,
-        2320
+        8448,
+        2704
       ],
-      "webhookId": "00ed5bdb-6662-40ce-852d-3dd2bab56ac4"
+      "webhookId": "00ed5bdb-6662-40ce-852d-3dd2bab56ac4",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bvkNnJES1sFSQOqH",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE results \nSET status = 'notified', updated_at = NOW()\nWHERE submission_id = $1::uuid",
         "options": {
-          "queryReplacement": "={{ $('Validate Input1').item.json.body.submission_id }}"
+          "queryReplacement": "={{ $('Validate Input1').first().json.body.submission_id }}"
         }
       },
-      "id": "0c2db8a2-4e48-4949-85d2-8c8ffdc10d6b",
+      "id": "cc3554c5-49bd-4e7e-a7ea-570d13635b1b",
       "name": "DB: Mark Notified1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1984,
-        2320
+        8672,
+        2704
       ],
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -300,20 +328,22 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO error_logs (n8n_execution_id, node_name, error_message, input_data) VALUES ('{{ $execution.id }}', 'Scoring/DB Error', '{{ $json.error?.message ?? \"Unknown error\" }}', '{{ JSON.stringify($json) }}'::jsonb)",
-        "options": {}
+        "query": "INSERT INTO error_logs (n8n_execution_id, node_name, error_message, input_data) VALUES ($1, 'Scoring/DB Error', $2, $3::jsonb)",
+        "options": {
+          "queryReplacement": "={{ [ String($execution.id), $json.error?.message ?? 'Unknown error', JSON.stringify({ session_token: $('Validate Input1').first().json.body.session_token, test_type: $('Validate Input1').first().json.body.test_type }) ] }}"
+        }
       },
-      "id": "13049664-5ac0-4040-9ee2-5513fcb0484d",
+      "id": "a4044a9a-4c61-4cbf-9020-62981b13b90f",
       "name": "DB: Log Error1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        768,
-        2128
+        7456,
+        2512
       ],
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -324,20 +354,20 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "54aab5c8-8c88-4b57-b4bf-c15625ccbb0f",
+      "id": "3ad562de-2bed-4962-a5ce-7c28d87b4347",
       "name": "GET /session1",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -656,
-        2064
+        6032,
+        2448
       ],
       "webhookId": "eba67030-47ee-40b5-b801-e49b57855edf"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($('DB: Get Session1').first().json) }}",
+        "responseBody": "={{ JSON.stringify($json) }}",
         "options": {
           "responseCode": 200,
           "responseHeaders": {
@@ -354,10 +384,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        48,
-        2032
+        6736,
+        2416
       ],
-      "id": "62981151-ce61-416a-bf74-c2011fb8ab6e"
+      "id": "8c695a14-6d21-4767-a712-b41b259b12db"
     },
     {
       "parameters": {
@@ -379,30 +409,31 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        48,
-        2128
+        6736,
+        2512
       ],
-      "id": "845c13fb-4dd0-4615-adb3-47c0dbddf9f6"
+      "id": "260aab5c-9f57-45a8-8062-0225a40c5ab3"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT status, used, expires_at \nFROM tokens \nWHERE token = $1\nLIMIT 1",
+        "query": "UPDATE tokens\nSET status = 'processing', used_at = NOW()\nWHERE token = $1\n  AND expires_at > NOW()\n  AND (status = 'pending'\n       OR (status = 'processing' AND used_at < NOW() - INTERVAL '10 minutes'))\nRETURNING token, full_name, status",
         "options": {
-          "queryReplacement": "={{ $json.body.session_token}}"
+          "queryReplacement": "={{ $json.body.session_token }}"
         }
       },
-      "id": "3e2a6b9d-ec1c-459e-b941-10692426e5b1",
+      "id": "b6d05fea-fb61-4fc4-827c-0415b4da6b9c",
       "name": "DB: Check Session Status1",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -224,
-        2448
+        6464,
+        2832
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -410,28 +441,44 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT d.telegram_id\nFROM tokens t\nJOIN doctors d ON d.id = t.doctor_id\nWHERE t.token = $1",
+        "query": "UPDATE tokens\nSET status = 'pending', used_at = NULL\nWHERE token = $1 AND status = 'processing'",
         "options": {
-          "queryReplacement": "={{ $('Validate Input1').item.json.body.session_token }}"
+          "queryReplacement": "={{ $('Validate Input1').first().json.body.session_token }}"
         }
       },
+      "id": "04f1bf57-788e-4fcc-b569-27fc6eb248d5",
+      "name": "DB: Release Token",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
+      "typeVersion": 2.5,
       "position": [
-        1280,
-        2352
+        7728,
+        2512
       ],
-      "id": "036b4af6-ec8c-424a-8004-d1d40ff8d350",
-      "name": "DB: Get Doctor1",
       "credentials": {
         "postgres": {
-          "id": "rSaWTC8b6UpIWeIK",
+          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"internal error\"}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "453c2278-6d2a-4bad-b037-bddf2a1fd97e",
+      "name": "Respond: 500",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        7984,
+        2512
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
     "DB: Get Session1": {
       "main": [
@@ -495,7 +542,7 @@
       "main": [
         [
           {
-            "node": "DB: Mark Session Completed1",
+            "node": "JS: Scoring1",
             "type": "main",
             "index": 0
           }
@@ -513,12 +560,7 @@
       "main": [
         [
           {
-            "node": "Respond: 200 OK1",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "JS: Scoring1",
+            "node": "HTTP: Notify Doctor1",
             "type": "main",
             "index": 0
           }
@@ -532,7 +574,9 @@
             "node": "DB: Save Result1",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "DB: Log Error1",
             "type": "main",
@@ -545,7 +589,19 @@
       "main": [
         [
           {
-            "node": "HTTP: Notify Doctor1",
+            "node": "Respond: 200 OK1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DB: Mark Session Completed1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB: Log Error1",
             "type": "main",
             "index": 0
           }
@@ -574,17 +630,6 @@
         ]
       ]
     },
-    "DB: Get Doctor1": {
-      "main": [
-        [
-          {
-            "node": "HTTP: Notify Doctor1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "HTTP: Notify Doctor1": {
       "main": [
         [
@@ -595,19 +640,40 @@
           }
         ]
       ]
+    },
+    "DB: Log Error1": {
+      "main": [
+        [
+          {
+            "node": "DB: Release Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Release Token": {
+      "main": [
+        [
+          {
+            "node": "Respond: 500",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "a49c7a3f-7ec9-41ec-9b25-a8bf757d3f1e",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "53024978c270d393c14a67bbe0731b54e861708369a4efdf653dd0c69d85ff1e"
+  "nodeGroups": [],
+  "versionCounter": 33,
+  "sourceWorkflowId": null,
+  "versionMetadata": {
+    "name": "Version 7797b80b",
+    "description": ""
   },
-  "id": "JE2E5cijQGsXY2tT",
-  "tags": []
+  "active": false
 }

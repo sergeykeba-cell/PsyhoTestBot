@@ -186,6 +186,8 @@ html, body {
   <div class="done-icon">✅</div>
   <div class="done-title">Дякуємо!</div>
   <div class="done-text">Результати надіслано лікарю. Ви отримаєте зворотний зв'язок найближчим часом.</div>
+  <p class="done-text" id="doneSummary" style="display:none;margin-top:12px"></p>
+  <button class="btn-primary" id="doneCloseBtn" style="display:none;margin-top:20px;flex:none;width:100%;max-width:320px;height:auto;padding:14px 20px" onclick="closeApp()">Закрити</button>
 </div>
 
 <script>
@@ -482,6 +484,27 @@ function showResult() {
   show('screen-result');
 }
 
+// Telegram.WebApp exists in a normal browser too, but close() is a no-op there: check initData
+function inTelegram() { return !!(tg && tg.initData); }
+
+function closeApp() {
+  if (inTelegram()) { tg.close(); return; }
+  window.close();
+}
+
+// Short, non-diagnostic summary for the patient. Only PCL-5 shows a number (plain sum 0-4 x 20 = same as the server).
+function fillDoneSummary() {
+  var el  = document.getElementById('doneSummary');
+  var btn = document.getElementById('doneCloseBtn');
+  var type = state.sessionData && state.sessionData.test_type;
+  if (type === 'pcl5' && state.answers.length === 20 && isFinite(state.score)) {
+    el.textContent = 'Сума балів: ' + state.score + ' із 80. Це орієнтовний показник, а не діагноз. '
+                   + 'Результат обговорить з вами лікар.';
+    el.style.display = '';
+  }
+  if (btn && inTelegram()) btn.style.display = '';
+}
+
 async function sendResults() {
   show('screen-sending');
   var payload = {
@@ -504,7 +527,7 @@ async function sendResults() {
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     if(tg&&tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     show('screen-done');
-    setTimeout(function(){ if(tg) tg.close(); }, 3000);
+    fillDoneSummary();
   } catch(err) {
     console.error(err);
     show('screen-result');

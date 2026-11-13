@@ -1,6 +1,7 @@
-*.bak
-*.bak-*
-content/
 .env
-patch_*.py
 venv/
+__pycache__/
+*.pyc
+*.bak*
+patch_*.py
+content/
