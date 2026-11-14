@@ -1,6 +1,5 @@
 {
   "name": "Психодіагностика — Головний Workflow v4",
-  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -22,7 +21,6 @@
       "executeOnce": false,
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -75,8 +73,7 @@
       "position": [
         6032,
         2832
-      ],
-      "webhookId": "241acb79-487b-45fe-9972-d6ca100c0dfb"
+      ]
     },
     {
       "parameters": {
@@ -215,7 +212,6 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -239,7 +235,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const start = Date.now();\nconst body = $('Validate Input1').first().json.body;\n\nconst test_type = body.test_type || '';\nconst patient   = body.patient_name || 'Невідомий';\n\n// ── Нормалізація відповідей ──────────────────────────────────────────────────\nlet raw = body.answers || [];\nlet answers;\nif (!Array.isArray(raw) && typeof raw === 'object') {\n  answers = Object.keys(raw).sort((a,b)=>parseInt(a)-parseInt(b)).map(k=>parseInt(raw[k])||0);\n} else {\n  answers = raw.map(a=>parseInt(a)||0);\n}\n\nfunction resolveType(declared, ans) {\n  if (['pcl5','minmult','schmishek'].includes(declared)) return declared;\n  if (ans.length <= 20) return 'pcl5';\n  if (ans.length <= 71) return 'minmult';\n  return 'schmishek';\n}\nconst resolved_type = resolveType(test_type, answers);\n\n// ── PCL-5 (20 питань, шкала 0-4) ────────────────────────────────────────────\n// Кластери DSM-5:\n// B (1-5)  — Вторгнення\n// C (6-7)  — Уникнення\n// D (8-14) — Негативні зміни когніцій/настрою\n// E (15-20)— Гіперзбудження\nfunction score_pcl5(ans) {\n  if (ans.length !== 20) throw new Error('PCL-5: expected 20 answers, got ' + ans.length);\n  const a = ans.map(v => Math.min(4, Math.max(0, v)));\n  const sum = (arr) => arr.reduce((s, v) => s + v, 0);\n  const pos = (arr) => arr.filter(v => v >= 2).length;\n  const cl = { B: a.slice(0,5), C: a.slice(5,7), D: a.slice(7,14), E: a.slice(14,20) };\n  const clusters = { B: sum(cl.B), C: sum(cl.C), D: sum(cl.D), E: sum(cl.E) };\n  const total = sum(a);\n  // DSM-5 provisional: >=1 B, >=1 C, >=2 D, >=2 E при оцінці >=2 (правило за пам'яттю, не перевірено)\n  const dsm_provisional = pos(cl.B)>=1 && pos(cl.C)>=1 && pos(cl.D)>=2 && pos(cl.E)>=2;\n  const cutoff_met = total >= 33; // діапазон порога 31–33 (не перевірено)\n  return {\n    total,\n    severity: 'pending',\n    severity_ua: `Сума ${total}/80; поріг 31–33: ${cutoff_met ? 'досягнуто' : 'не досягнуто'}; DSM-5 (попередньо): ${dsm_provisional ? 'так' : 'ні'}`,\n    ptsd_probable: dsm_provisional || cutoff_met,\n    details: { clusters, dsm_provisional, cutoff_met },\n    subscales: {\n      'B_Вторгнення': clusters.B, 'C_Уникнення': clusters.C,\n      'D_Когніції/настрій': clusters.D, 'E_Збудження': clusters.E,\n    },\n  };\n}\n\n// ── Міні-Мульт (Kincannon 1968; Зайцев 1981) — 71 питання, відповіді Так(1)/Ні(0) ──\n// УВАГА: ключ взято з методички (gosuslugi PDF), НЕ верифіковано за Козюля В.Г. (1994).\n// Відомі підозрілі місця: шкала D (номер 11 і в \"Ні\", і в \"Так\"), шкала F.\n// Нумерація питань має збігатися з версією тексту, до якої складено ключ (пп. 26-27 розходяться між джерелами).\n// Т-бали потребують профільних листів (Козюля) — тут не розраховуються.\nconst MM_KEY = {\n  L:  { no: [8,11,24,47,53], yes: [] },\n  F:  { no: [22,24,61], yes: [9,12,15,19,30,38,48,49,58,59,64,71] },\n  K:  { no: [11,23,31,33,34,36,40,41,43,51,56,61,65,67,69,70], yes: [] },\n  'Hs_1_Іпохондрія':   { no: [1,2,6,37,48], yes: [9,18,26,32,44,46,55,62,63] },\n  'D_2_Депресія':      { no: [1,3,6,11,28,37,40,42,60,65,71], yes: [9,13,18,22,25,36,44] },\n  'Hy_3_Істерія':      { no: [1,2,3,11,23,28,29,31,33,35,37,40,41,43,45,50,56], yes: [9,13,18,26,44,46,55,57,62] },\n  'Pd_4_Психопатія':   { no: [3,28,34,35,41,43,50,65], yes: [7,10,13,14,15,16,22,27,52,58,71] },\n  'Pa_6_Параноя':      { no: [28,29,31,67], yes: [5,8,10,15,30,39,63,64,66,68] },\n  'Pt_7_Психастенія':  { no: [2,3,42], yes: [5,8,13,17,22,25,27,36,44,51,57,66,68] },\n  'Sc_8_Шизоїдність':  { no: [3,42], yes: [5,7,8,10,13,14,15,16,17,30,38,39,46,57,63,64,66] },\n  'Ma_9_Гіпоманія':    { no: [43], yes: [4,7,8,21,29,34,38,39,54,57,60] },\n};\n// Поправка на K: частка K, що додається до шкали\nconst MM_K_COEF = { 'Hs_1_Іпохондрія': 0.5, 'Pd_4_Психопатія': 0.4, 'Pt_7_Психастенія': 1.0, 'Sc_8_Шизоїдність': 1.0, 'Ma_9_Гіпоманія': 0.2 };\n\nfunction score_minmult(ans) {\n  if (ans.length !== 71) throw new Error('Mini-Mult: expected 71 answers, got ' + ans.length);\n  const a = ans.slice(0, 71);\n  const raw = {};\n  for (const [name, key] of Object.entries(MM_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    raw[name] = s;\n  }\n  const K = raw.K;\n  const clinical = Object.keys(MM_KEY).filter(n => !['L','F','K'].includes(n));\n  const scales = {};\n  for (const n of clinical) scales[n] = raw[n] + Math.round((MM_K_COEF[n] || 0) * K);\n  const values = clinical.map(n => scales[n]);\n  const maxVal = Math.max(...values);\n  const total = values.reduce((s,v) => s+v, 0);\n  const peak_scale = clinical[values.indexOf(maxVal)];\n  return {\n    total,\n    severity: 'unknown',\n    severity_ua: 'Т-бали не розраховано (див. шкали)',\n    peak_scale,\n    subscales: scales,\n    validity: { L: raw.L, F: raw.F, K },\n    elevated_scales: []\n  };\n}\n\n// ── Шмішек — 88 питань, відповіді Так(1)/Ні(0), 10 шкал (Леонгард) ──────────────\n// Ключ і множники: стандартний ключ опитувальника (методичка gosuslugi PDF). Макс. на шкалу = 24.\nconst SCH_KEY = {\n  'Демонстративність': { yes: [7,19,22,29,41,44,63,66,73,85,88], no: [51], mult: 2 },\n  'Застрягання':       { yes: [2,15,24,34,37,56,68,78,81],       no: [12,46,59], mult: 2 },\n  'Педантизм':         { yes: [4,14,17,26,39,48,58,61,70,80,83], no: [36], mult: 2 },\n  'Збудливість':       { yes: [8,20,30,42,52,64,74,86],          no: [], mult: 3 },\n  'Гіпертимія':        { yes: [1,11,23,33,45,55,67,77],          no: [], mult: 3 },\n  'Дистимія':          { yes: [9,21,43,75,87],                   no: [31,53,65], mult: 3 },\n  'Тривожність':       { yes: [16,27,38,49,60,71,82],            no: [5], mult: 3 },\n  'Екзальтованість':   { yes: [10,32,54,76],                     no: [], mult: 6 },\n  'Емотивність':       { yes: [3,13,35,47,57,69,79],             no: [25], mult: 3 },\n  'Циклотимія':        { yes: [6,18,28,40,50,62,72,84],          no: [], mult: 3 },\n};\n// Джерела розходяться: ознака акцентуації >12 або >19 (15-19 = тенденція). Змінюйте тут.\nconst SCH_ACCENT_MIN = 20;\n\nfunction score_schmishek(ans) {\n  if (ans.length !== 88) throw new Error('Schmishek: expected 88 answers, got ' + ans.length);\n  const a = ans.slice(0, 88);\n  const scales = {};\n  for (const [name, key] of Object.entries(SCH_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    scales[name] = s * key.mult;\n  }\n  const entries = Object.entries(scales);\n  const peak = [...entries].sort(([,x],[,y]) => y - x)[0];\n  const total = entries.reduce((s,[,v]) => s+v, 0);\n  const accentuated = entries.filter(([,v]) => v >= SCH_ACCENT_MIN).map(([k]) => k);\n\n  let severity, severity_ua;\n  if (accentuated.length === 0)     { severity='low';      severity_ua='В нормі'; }\n  else if (accentuated.length <= 2) { severity='moderate'; severity_ua='Акцентуація'; }\n  else if (accentuated.length <= 4) { severity='high';     severity_ua='Виражена'; }\n  else                              { severity='severe';   severity_ua='Дуже виражена'; }\n\n  return {\n    total, severity, severity_ua,\n    subscales: Object.fromEntries([...entries].sort(([,x],[,y]) => y - x)),\n    accentuated_types: accentuated,\n    peak_type: peak?.[0],\n    peak_score: peak?.[1]\n  };\n}\n\n// ── Запуск ───────────────────────────────────────────────────────────────────\nconst scorers    = { pcl5: score_pcl5, minmult: score_minmult, schmishek: score_schmishek };\nconst test_names = { pcl5:'PCL-5 (ПТСР)', minmult:'Міні-Мульт (MMPI)', schmishek:'Шмішек (акцентуації)' };\n\nif (!scorers[resolved_type]) throw new Error('Unknown test_type: ' + resolved_type);\n\nconst result = scorers[resolved_type](answers);\nconst scoring_time_ms = Date.now() - start;\n\nreturn [{\n  json: {\n    ...body,\n    answers,\n    test_type:        resolved_type,\n    test_name:        test_names[resolved_type],\n    score:            result.total,\n    severity:         result.severity,\n    severity_ua:      result.severity_ua,\n    subscales:        result.subscales,\n    scoring_time_ms,\n    // Поля специфічні для кожного тесту\n    ...(result.ptsd_probable     !== undefined && { ptsd_probable:     result.ptsd_probable }),\n    ...(result.peak_scale        !== undefined && { peak_scale:        result.peak_scale }),\n    ...(result.elevated_scales   !== undefined && { elevated_scales:   result.elevated_scales }),\n    ...(result.validity          !== undefined && { validity:          result.validity }),\n    ...(result.accentuated_types !== undefined && { accentuated_types: result.accentuated_types }),\n    ...(result.peak_type         !== undefined && { peak_type:         result.peak_type }),\n    ...(result.peak_score        !== undefined && { peak_score:        result.peak_score }),\n    ...(result.details           !== undefined && { details:           result.details }),\n  }\n}];\n"
+        "jsCode": "const start = Date.now();\nconst body = $('Validate Input1').first().json.body;\n\nconst test_type = body.test_type || '';\nconst patient   = body.patient_name || 'Невідомий';\n\n// ── Нормалізація відповідей ──────────────────────────────────────────────────\nlet raw = body.answers || [];\nlet answers;\nif (!Array.isArray(raw) && typeof raw === 'object') {\n  answers = Object.keys(raw).sort((a,b)=>parseInt(a)-parseInt(b)).map(k=>parseInt(raw[k])||0);\n} else {\n  answers = raw.map(a=>parseInt(a)||0);\n}\n\nfunction resolveType(declared, ans) {\n  if (['pcl5','minmult','schmishek'].includes(declared)) return declared;\n  if (ans.length <= 20) return 'pcl5';\n  if (ans.length <= 71) return 'minmult';\n  return 'schmishek';\n}\nconst resolved_type = resolveType(test_type, answers);\n\n// ── Сувора перевірка відповідей: жодних мовчазних підстановок нулів ─────────\n// Порожнє, нечислове або недопустиме значення = помилка (токен звільняється, пацієнт отримує 500 і може повторити).\nconst ALLOWED_VALUES = { pcl5: [0, 1, 2, 3, 4], minmult: [0, 1], schmishek: [0, 1] };\nconst rawList = Array.isArray(raw)\n  ? raw\n  : Object.keys(raw).sort((a, b) => parseInt(a) - parseInt(b)).map(k => raw[k]);\nconst isValidAnswer = (v) =>\n  (typeof v === 'number' || (typeof v === 'string' && /^\\d+$/.test(v))) &&\n  ALLOWED_VALUES[resolved_type].includes(Number(v));\nif (!rawList.every(isValidAnswer)) {\n  throw new Error('Invalid answer value for ' + resolved_type + ' (empty, non-numeric or out of range)');\n}\n\n// ── PCL-5 (20 питань, шкала 0-4) ────────────────────────────────────────────\n// Кластери DSM-5:\n// B (1-5)  — Вторгнення\n// C (6-7)  — Уникнення\n// D (8-14) — Негативні зміни когніцій/настрою\n// E (15-20)— Гіперзбудження\nfunction score_pcl5(ans) {\n  if (ans.length !== 20) throw new Error('PCL-5: expected 20 answers, got ' + ans.length);\n  const a = ans.map(v => Math.min(4, Math.max(0, v)));\n  const sum = (arr) => arr.reduce((s, v) => s + v, 0);\n  const pos = (arr) => arr.filter(v => v >= 2).length;\n  const cl = { B: a.slice(0,5), C: a.slice(5,7), D: a.slice(7,14), E: a.slice(14,20) };\n  const clusters = { B: sum(cl.B), C: sum(cl.C), D: sum(cl.D), E: sum(cl.E) };\n  const total = sum(a);\n  // DSM-5 provisional: >=1 B, >=1 C, >=2 D, >=2 E при оцінці >=2 (правило за пам'яттю, не перевірено)\n  const dsm_provisional = pos(cl.B)>=1 && pos(cl.C)>=1 && pos(cl.D)>=2 && pos(cl.E)>=2;\n  const cutoff_met = total >= 33; // діапазон порога 31–33 (не перевірено)\n  return {\n    total,\n    severity: 'pending',\n    severity_ua: `Сума ${total}/80; поріг 31–33: ${cutoff_met ? 'досягнуто' : 'не досягнуто'}; DSM-5 (попередньо): ${dsm_provisional ? 'так' : 'ні'}`,\n    ptsd_probable: dsm_provisional || cutoff_met,\n    details: { clusters, dsm_provisional, cutoff_met },\n    subscales: {\n      'B_Вторгнення': clusters.B, 'C_Уникнення': clusters.C,\n      'D_Когніції/настрій': clusters.D, 'E_Збудження': clusters.E,\n    },\n  };\n}\n\n// ── Міні-Мульт (Kincannon 1968; Зайцев, Козюля) — 71 питання, відповіді Так(1)/Ні(0) ──\n// Ключ звірено по всіх 11 шкалах з другим джерелом (psychic.at.ua, Зайцев і Козюля);\n// з оригіналом Козюля В.Г. (1994) НЕ звірено.\n// Нумерація питань збігається з текстом 71 питання цього джерела.\n// У джерелі пункт 24 стоїть і в L, і в F (відповідь «Ні») — можлива помилка джерела, збережено як є.\n// Бали Hs, Pd, Pt, Sc, Ma повертаються вже з поправкою на K; сирі бали — у details.subscales_raw.\n// T-бали: T = 50 + 10·(X − M)/σ, норми M і σ за статтю з таблиці джерела (формула на сторінці — картинка, взято стандартну MMPI).\nconst MM_KEY = {\n  L:  { no: [5,11,24,47,53], yes: [] },\n  F:  { no: [22,24,61], yes: [9,12,15,19,30,38,48,49,58,59,64,71] },\n  K:  { no: [11,23,31,33,34,36,40,41,43,51,56,61,65,67,69,70], yes: [] },\n  'Hs_1_Іпохондрія':   { no: [1,2,6,37,45], yes: [9,18,26,32,44,46,55,62,63] },\n  'D_2_Депресія':      { no: [1,3,6,11,28,37,40,42,60,65,71], yes: [9,13,17,18,22,25,36,44] },\n  'Hy_3_Істерія':      { no: [1,2,3,11,23,28,29,31,33,35,37,40,41,43,45,50,56], yes: [9,13,18,26,44,46,55,57,62] },\n  'Pd_4_Психопатія':   { no: [3,28,34,35,41,43,50,65], yes: [7,10,13,14,15,16,22,27,52,58,71] },\n  'Pa_6_Параноя':      { no: [28,29,31,67], yes: [5,8,10,15,30,39,63,64,66,68] },\n  'Pt_7_Психастенія':  { no: [2,3,42], yes: [5,8,13,17,22,25,27,36,44,51,57,66,68] },\n  'Sc_8_Шизоїдність':  { no: [3,42], yes: [5,7,8,10,13,14,15,16,17,26,30,38,39,46,57,63,64,66] },\n  'Ma_9_Гіпоманія':    { no: [43], yes: [4,7,8,21,29,34,38,39,54,57,60] },\n};\n// Поправка на K: частка K, що додається до шкали\nconst MM_K_COEF = { 'Hs_1_Іпохондрія': 0.5, 'Pd_4_Психопатія': 0.4, 'Pt_7_Психастенія': 1.0, 'Sc_8_Шизоїдність': 1.0, 'Ma_9_Гіпоманія': 0.2 };\n\n// Pd: поправка 0,4К берётся из таблицы источника (Math.round расходится с ней при K=1 и K=3)\nconst MM_PD_TABLE = {0:0,1:1,2:1,3:2,4:2,5:2,6:2,7:3,8:3,9:4,10:4,11:4,12:5,13:5,14:6,15:6,16:6};\nfunction mm_k_add(n, K) {\n  if (n === 'Pd_4_Психопатія' && MM_PD_TABLE[K] !== undefined) return MM_PD_TABLE[K];\n  return Math.round((MM_K_COEF[n] || 0) * K);\n}\n\n// ── T-бали (T = 50 + 10·(X − M)/σ), норми за статтю з таблиці джерела ──────────\n// Х для Hs, Pd, Pt, Sc, Ma — бал уже з поправкою на K; L, F, K — сирі.\nconst MM_NORMS = {\n  M: { L:[1.48,1.23], F:[3.1,2.3], K:[7.68,3.42],\n       'Hs_1_Іпохондрія':[7.24,3], 'D_2_Депресія':[7.02,2.68], 'Hy_3_Істерія':[9.73,2.91],\n       'Pd_4_Психопатія':[10.39,2.13], 'Pa_6_Параноя':[4.03,1.74], 'Pt_7_Психастенія':[13.57,2.51],\n       'Sc_8_Шизоїдність':[13.68,2.83], 'Ma_9_Гіпоманія':[6.23,1.55] },\n  F: { L:[1.51,1.19], F:[2.64,1.71], K:[7.72,2.64],\n       'Hs_1_Іпохондрія':[8.47,2.92], 'D_2_Депресія':[7.96,3], 'Hy_3_Істерія':[11.53,3.38],\n       'Pd_4_Психопатія':[9.76,1.9], 'Pa_6_Параноя':[4.77,2], 'Pt_7_Психастенія':[14.48,2.27],\n       'Sc_8_Шизоїдність':[13.52,2.8], 'Ma_9_Гіпоманія':[6.35,1.91] },\n};\nfunction mm_t(sex, name, x) {\n  const t = MM_NORMS[sex] && MM_NORMS[sex][name];\n  return t ? Math.round(50 + 10 * (x - t[0]) / t[1]) : null;\n}\nconst session_sex = (() => {\n  try {\n    const s = String($('DB: Check Session Status1').first().json.sex || '').trim().toUpperCase();\n    return (s === 'M' || s === 'F') ? s : null;\n  } catch (e) { return null; }\n})();\n\nfunction score_minmult(ans, sex) {\n  if (ans.length !== 71) throw new Error('Mini-Mult: expected 71 answers, got ' + ans.length);\n  const a = ans.slice(0, 71);\n  const raw = {};\n  for (const [name, key] of Object.entries(MM_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    raw[name] = s;\n  }\n  const K = raw.K;\n  const clinical = Object.keys(MM_KEY).filter(n => !['L','F','K'].includes(n));\n  const scales = {};\n  const scales_raw = {};\n  for (const n of clinical) { scales_raw[n] = raw[n]; scales[n] = raw[n] + mm_k_add(n, K); }\n  const values = clinical.map(n => scales[n]);\n  const maxVal = Math.max(...values);\n  const total = values.reduce((s,v) => s+v, 0);\n  const peak_scale = clinical[values.indexOf(maxVal)];\n  const validity = { L: raw.L, F: raw.F, K };\n  let t_scores = null, t_validity = null;\n  if (sex) {\n    t_scores = {}; for (const n of clinical) t_scores[n] = mm_t(sex, n, scales[n]);\n    t_validity = { L: mm_t(sex, 'L', raw.L), F: mm_t(sex, 'F', raw.F), K: mm_t(sex, 'K', raw.K) };\n  }\n  return {\n    total,\n    severity: 'unknown',\n    severity_ua: 'Т-бали не розраховано (див. шкали)',\n    peak_scale,\n    subscales: scales,\n    validity,\n    elevated_scales: [],\n    details: { subscales: scales, subscales_raw: scales_raw, validity, peak_scale, k_corrected: true, sex: sex || null, ...(t_scores ? { t_scores, t_validity, t_formula: 'T = 50 + 10*(X - M)/sigma' } : {}) }\n  };\n}\n\n// ── Шмішек — 88 питань, відповіді Так(1)/Ні(0), 10 шкал (Леонгард) ──────────────\n// Питання взято з kipt.sumdu.edu.ua (опитувальник Леонгарда-Шмішека). Макс. на шкалу = 24.\n// Розбіжності ключа з текстом джерела (збережено наш варіант за змістом питань):\n//  • Педантизм: у джерелі (+) …39, 63, 80 і (−) 36; у нас (+) …36, 80, 83 і (−) 39;\n//  • Демонстративність: у джерелі немає п. 44; Дистимія: у джерелі немає «Ні»-пунктів 31, 53, 65\n//    (без них максимум нижчий за заявлені 24);\n//  • Збудливість: у джерелі не вказано множник, прийнято ×3 (макс. 24).\nconst SCH_KEY = {\n  'Демонстративність': { yes: [7,19,22,29,41,44,63,66,73,85,88], no: [51], mult: 2 },\n  'Застрягання':       { yes: [2,15,24,34,37,56,68,78,81],       no: [12,46,59], mult: 2 },\n  'Педантизм':         { yes: [4,14,17,26,36,48,58,61,70,80,83], no: [39], mult: 2 },\n  'Збудливість':       { yes: [8,20,30,42,52,64,74,86],          no: [], mult: 3 },\n  'Гіпертимія':        { yes: [1,11,23,33,45,55,67,77],          no: [], mult: 3 },\n  'Дистимія':          { yes: [9,21,43,75,87],                   no: [31,53,65], mult: 3 },\n  'Тривожність':       { yes: [16,27,38,49,60,71,82],            no: [5], mult: 3 },\n  'Екзальтованість':   { yes: [10,32,54,76],                     no: [], mult: 6 },\n  'Емотивність':       { yes: [3,13,35,47,57,69,79],             no: [25], mult: 3 },\n  'Циклотимія':        { yes: [6,18,28,40,50,62,72,84],          no: [], mult: 3 },\n};\n// Джерела розходяться: ознака акцентуації >12 або >19 (15-19 = тенденція). Змінюйте тут.\nconst SCH_ACCENT_MIN = 20;\n// Джерело: 15–19 балів — лише тенденція до акцентуації, >19 — акцентуація\nconst SCH_TENDENCY_MIN = 15;\n\nfunction score_schmishek(ans) {\n  if (ans.length !== 88) throw new Error('Schmishek: expected 88 answers, got ' + ans.length);\n  const a = ans.slice(0, 88);\n  const scales = {};\n  for (const [name, key] of Object.entries(SCH_KEY)) {\n    let s = 0;\n    for (const k of key.yes) if (k <= a.length && a[k-1] === 1) s++;\n    for (const k of key.no)  if (k <= a.length && a[k-1] === 0) s++;\n    scales[name] = s * key.mult;\n  }\n  const entries = Object.entries(scales);\n  const peak = [...entries].sort(([,x],[,y]) => y - x)[0];\n  const total = entries.reduce((s,[,v]) => s+v, 0);\n  const accentuated = entries.filter(([,v]) => v >= SCH_ACCENT_MIN).map(([k]) => k);\n\n  let severity, severity_ua;\n  if (accentuated.length === 0)     { severity='low';      severity_ua='В нормі'; }\n  else if (accentuated.length <= 2) { severity='moderate'; severity_ua='Акцентуація'; }\n  else if (accentuated.length <= 4) { severity='high';     severity_ua='Виражена'; }\n  else                              { severity='severe';   severity_ua='Дуже виражена'; }\n\n  const profile = Object.keys(SCH_KEY).map(name => ({\n    name,\n    score: scales[name],\n    level: scales[name] >= SCH_ACCENT_MIN ? 'accentuation' : (scales[name] >= SCH_TENDENCY_MIN ? 'tendency' : 'normal')\n  }));\n  const tendency = profile.filter(p => p.level === 'tendency').map(p => p.name);\n  return {\n    total, severity, severity_ua,\n    subscales: Object.fromEntries([...entries].sort(([,x],[,y]) => y - x)),\n    accentuated_types: accentuated,\n    peak_type: peak?.[0],\n    peak_score: peak?.[1],\n    details: { profile, accentuated_types: accentuated, tendency_types: tendency, thresholds: { accentuation: SCH_ACCENT_MIN, tendency: SCH_TENDENCY_MIN }, max_per_scale: 24 }\n  };\n}\n\n// ── Запуск ───────────────────────────────────────────────────────────────────\nconst scorers    = { pcl5: score_pcl5, minmult: score_minmult, schmishek: score_schmishek };\nconst test_names = { pcl5:'PCL-5 (ПТСР)', minmult:'Міні-Мульт (MMPI)', schmishek:'Шмішек (акцентуації)' };\n\nif (!scorers[resolved_type]) throw new Error('Unknown test_type: ' + resolved_type);\n\nconst result = scorers[resolved_type](answers, session_sex);\nconst scoring_time_ms = Date.now() - start;\n\nreturn [{\n  json: {\n    ...body,\n    answers,\n    test_type:        resolved_type,\n    test_name:        test_names[resolved_type],\n    score:            result.total,\n    severity:         result.severity,\n    severity_ua:      result.severity_ua,\n    subscales:        result.subscales,\n    scoring_time_ms,\n    // Поля специфічні для кожного тесту\n    ...(result.ptsd_probable     !== undefined && { ptsd_probable:     result.ptsd_probable }),\n    ...(result.peak_scale        !== undefined && { peak_scale:        result.peak_scale }),\n    ...(result.elevated_scales   !== undefined && { elevated_scales:   result.elevated_scales }),\n    ...(result.validity          !== undefined && { validity:          result.validity }),\n    ...(result.accentuated_types !== undefined && { accentuated_types: result.accentuated_types }),\n    ...(result.peak_type         !== undefined && { peak_type:         result.peak_type }),\n    ...(result.peak_score        !== undefined && { peak_score:        result.peak_score }),\n    ...(result.details           !== undefined && { details:           result.details }),\n  }\n}];\n"
       },
       "id": "0496b72f-8b48-445d-92fa-31bbdb0344a6",
       "name": "JS: Scoring1",
@@ -269,7 +265,6 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       },
@@ -294,10 +289,8 @@
         8448,
         2704
       ],
-      "webhookId": "00ed5bdb-6662-40ce-852d-3dd2bab56ac4",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "bvkNnJES1sFSQOqH",
           "name": "Header Auth account"
         }
       }
@@ -320,7 +313,6 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -343,7 +335,6 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -361,8 +352,7 @@
       "position": [
         6032,
         2448
-      ],
-      "webhookId": "eba67030-47ee-40b5-b801-e49b57855edf"
+      ]
     },
     {
       "parameters": {
@@ -417,7 +407,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE tokens\nSET status = 'processing', used_at = NOW()\nWHERE token = $1\n  AND expires_at > NOW()\n  AND (status = 'pending'\n       OR (status = 'processing' AND used_at < NOW() - INTERVAL '10 minutes'))\nRETURNING token, full_name, status",
+        "query": "UPDATE tokens\nSET status = 'processing', used_at = NOW()\nWHERE token = $1\n  AND expires_at > NOW()\n  AND (status = 'pending'\n       OR (status = 'processing' AND used_at < NOW() - INTERVAL '10 minutes'))\nRETURNING token, full_name, status, sex",
         "options": {
           "queryReplacement": "={{ $json.body.session_token }}"
         }
@@ -433,7 +423,6 @@
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -456,7 +445,6 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "MMxZwNYxfnhCcp4N",
           "name": "Postgres account"
         }
       }
@@ -479,6 +467,7 @@
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "DB: Get Session1": {
       "main": [
@@ -664,16 +653,11 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "nodeGroups": [],
-  "versionCounter": 33,
-  "sourceWorkflowId": null,
-  "versionMetadata": {
-    "name": "Version 7797b80b",
-    "description": ""
-  },
-  "active": false
+  "meta": {},
+  "tags": []
 }
