@@ -47,6 +47,11 @@ def _grid(data, widths):
     return t
 
 
+def _mm_label(name: str) -> str:
+    p = str(name).split('_', 2)
+    return f"{p[0]} ({p[1]}) {p[2]}" if len(p) == 3 else str(name)
+
+
 def generate_pdf_report(result_data: dict) -> BytesIO:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm,
@@ -69,8 +74,7 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     story = [Paragraph('ЗВІТ ПРО ТЕСТУВАННЯ', title), Paragraph(_xe(test_name), head),
              Spacer(1, 0.5*cm),
              _grid([['Пацієнт:', str(result_data.get('patient_name') or '—')],
-                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')],
-                    ['Загальний бал:', str(result_data.get('score', '—'))]], [5*cm, 10*cm]),
+                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
              Spacer(1, 1*cm)]
 
     if test_type == 'pcl5' and cl:
@@ -85,6 +89,50 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                 "PCL-5 є скринінговим інструментом: діагноз встановлює лише клініцист.")
     elif test_type == 'pcl5':
         text = 'Дані кластерів відсутні (результат отримано до оновлення скорера).'
+    elif test_type == 'schmishek' and d.get('profile'):
+        lvl = {'accentuation': 'акцентуація', 'tendency': 'тенденція', 'normal': 'норма'}
+        story += [Paragraph('ПРОФІЛЬ АКЦЕНТУАЦІЙ', head),
+                  _grid([['Шкала', 'Бал (макс. 24)', 'Рівень']] +
+                        [[p['name'], str(p['score']), lvl.get(p['level'], '—')] for p in d['profile']],
+                        [6*cm, 4.5*cm, 4.5*cm]),
+                  Spacer(1, 0.5*cm)]
+        text = ('Бал на кожній шкалі від 0 до 24. За джерелом: понад 19 балів — акцентуація, '
+                '15–19 — лише тенденція; у літературі пороги розходяться. '
+                'Акцентуація не є патологією. Профіль інтерпретує фахівець.')
+    elif test_type == 'minmult' and d.get('subscales'):
+        v = d.get('validity') or {}
+        ts = d.get('t_scores') or {}
+        tv = d.get('t_validity') or {}
+        order = lambda kv: int(kv[0].split('_')[1]) if kv[0].count('_') >= 2 else 99
+        rows = sorted(d['subscales'].items(), key=order)
+        if ts:
+            story += [Paragraph('ШКАЛИ (бали з поправкою на K) ТА T-БАЛИ', head),
+                      _grid([['Шкала', 'Бал', 'T-бал']] +
+                            [[_mm_label(n), str(x), str(ts.get(n, '—'))] for n, x in rows],
+                            [7*cm, 4*cm, 4*cm]),
+                      Spacer(1, 0.5*cm),
+                      Paragraph('ОЦІНОЧНІ ШКАЛИ', head),
+                      _grid([['Шкала', 'Бал', 'T-бал'],
+                             ['L (брехня)', str(v.get('L', '—')), str(tv.get('L', '—'))],
+                             ['F (вірогідність)', str(v.get('F', '—')), str(tv.get('F', '—'))],
+                             ['K (корекція)', str(v.get('K', '—')), str(tv.get('K', '—'))]],
+                            [7*cm, 4*cm, 4*cm]),
+                      Spacer(1, 0.5*cm)]
+            text = ('Бали шкал Hs, Pd, Pt, Sc, Ma подано з поправкою на K. '
+                    'T-бали розраховано за формулою T = 50 + 10·(X − M)/σ за нормами джерела '
+                    f"для статі: {'чоловіча' if d.get('sex') == 'M' else 'жіноча'}. "
+                    'Профіль інтерпретує фахівець.')
+        else:
+            story += [Paragraph('ШКАЛИ (бали з поправкою на K)', head),
+                      _grid([[_mm_label(n), str(x)] for n, x in rows], [9*cm, 6*cm]),
+                      Spacer(1, 0.5*cm),
+                      Paragraph('ОЦІНОЧНІ ШКАЛИ', head),
+                      _grid([['L (брехня)', str(v.get('L', '—'))],
+                             ['F (вірогідність)', str(v.get('F', '—'))],
+                             ['K (корекція)', str(v.get('K', '—'))]], [9*cm, 6*cm]),
+                      Spacer(1, 0.5*cm)]
+            text = ('Бали шкал Hs, Pd, Pt, Sc, Ma подано з поправкою на K. '
+                    'T-бали не розраховано (стать не вказана). Профіль інтерпретує фахівець.')
     else:
         text = 'Інтерпретація потребує фахівця.'
 

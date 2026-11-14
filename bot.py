@@ -52,8 +52,8 @@ from report import generate_pdf_report, parse_details
 
 TESTS = {
     "pcl5":      {"name": "PCL-5 (ПТСР)",                    "emoji": "🧠"},
-    # "minmult":   {"name": "Mini-Mult (short MMPI)",           "emoji": "📋"},
-    # "schmishek": {"name": "Schmishek (character accentuations)", "emoji": "🔍"},
+    "minmult":   {"name": "Mini-Mult (скорочений MMPI)", "emoji": "📋"},
+    "schmishek": {"name": "Шмішек (акцентуації характеру)", "emoji": "🔍"},
 }
 
 logging.basicConfig(
@@ -68,6 +68,7 @@ class NewTest(StatesGroup):
     choosing_test = State()
     entering_name = State()
     confirming    = State()
+    choosing_sex  = State()
 
 bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
@@ -99,12 +100,12 @@ async def ensure_doctor(telegram_id: int, full_name: str) -> int:
     return row["id"]
 
 
-async def create_session(doctor_id: int, patient_name: str, test_type: str) -> str:
+async def create_session(doctor_id: int, patient_name: str, test_type: str, sex=None) -> str:
     pool = await get_db()
     token = str(uuid.uuid4())
     await pool.execute(
-        "INSERT INTO tokens (token, doctor_id, full_name, test_type, status) VALUES ($1, $2, $3, $4, 'pending')",
-        token, doctor_id, patient_name, test_type
+        "INSERT INTO tokens (token, doctor_id, full_name, test_type, status, sex) VALUES ($1, $2, $3, $4, 'pending', $5)",
+        token, doctor_id, patient_name, test_type, sex
     )
     return token
 
@@ -190,6 +191,16 @@ def kb_test_selection() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def kb_sex() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👨 Чоловіча", callback_data="sex:M"),
+            InlineKeyboardButton(text="👩 Жіноча",   callback_data="sex:F"),
+        ],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="sex:cancel")],
+    ])
+
+
 def kb_confirm() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -247,7 +258,7 @@ async def cb_test_selected(cb: CallbackQuery, state: FSMContext):
     if test_type not in TESTS:
         await cb.answer("Невідомий тест", show_alert=True)
         return
-    await state.update_data(test_type=test_type)
+    await state.update_data(test_type=test_type, sex=None)
     await state.set_state(NewTest.entering_name)
     await cb.message.edit_text(
         f"✅ Обрано: <b>{_h(TESTS[test_type]['name'])}</b>\n\n"
@@ -278,6 +289,14 @@ async def handle_patient_name(msg: Message, state: FSMContext):
         return
     data = await state.get_data()
     await state.update_data(patient_name=name)
+    if data['test_type'] == 'minmult':
+        await state.set_state(NewTest.choosing_sex)
+        await msg.answer(
+            f"👤 Пацієнт: <b>{_h(name)}</b>\n\n"
+            "⚧ Оберіть <b>стать пацієнта</b> (потрібна для норм при розрахунку Т-балів):",
+            reply_markup=kb_sex(), parse_mode="HTML"
+        )
+        return
     await state.set_state(NewTest.confirming)
     await msg.answer(
         f"📝 <b>Перевірте дані:</b>\n\n"
@@ -286,6 +305,31 @@ async def handle_patient_name(msg: Message, state: FSMContext):
         "Все вірно?",
         reply_markup=kb_confirm(), parse_mode="HTML"
     )
+
+
+@router.callback_query(F.data.startswith("sex:"), NewTest.choosing_sex)
+async def cb_sex_selected(cb: CallbackQuery, state: FSMContext):
+    val = cb.data.split(":")[1]
+    if val == "cancel":
+        await state.clear()
+        await cb.message.edit_text("❌ Скасовано.", reply_markup=kb_main_menu())
+        await cb.answer()
+        return
+    if val not in ("M", "F"):
+        await cb.answer("Невідомий вибір", show_alert=True)
+        return
+    await state.update_data(sex=val)
+    data = await state.get_data()
+    await state.set_state(NewTest.confirming)
+    await cb.message.edit_text(
+        f"📝 <b>Перевірте дані:</b>\n\n"
+        f"👤 Пацієнт: <b>{_h(data['patient_name'])}</b>\n"
+        f"⚧ Стать: <b>{'Чоловіча' if val == 'M' else 'Жіноча'}</b>\n"
+        f"🧪 Тест: <b>{_h(TESTS[data['test_type']]['name'])}</b>\n\n"
+        "Все вірно?",
+        reply_markup=kb_confirm(), parse_mode="HTML"
+    )
+    await cb.answer()
 
 
 @router.callback_query(F.data.startswith("confirm:"), NewTest.confirming)
@@ -313,7 +357,7 @@ async def cb_confirm(cb: CallbackQuery, state: FSMContext):
 
     try:
         doctor_id = await ensure_doctor(cb.from_user.id, cb.from_user.full_name)
-        token     = await create_session(doctor_id, data["patient_name"], data["test_type"])
+        token     = await create_session(doctor_id, data["patient_name"], data["test_type"], data.get("sex"))
         test_url  = f"{MINI_APP_URL}?token={token}"
         qr_bytes  = await generate_qr_bytes(test_url)
         qr_file   = BufferedInputFile(qr_bytes, filename=f"test_{token[:8]}.png")
@@ -426,11 +470,33 @@ async def cb_view_result(cb: CallbackQuery):
     lines = ["📊 <b>Результат тесту</b>", "",
              f"👤 Пацієнт: <b>{esc(r['patient_name'])}</b>",
              f"🧪 Тест: {esc(test_name)}",
-             f"📅 Дата: {r['completed_at'].strftime('%d.%m.%Y %H:%M')}", ""]
+             f"📅 Дата: {r['completed_at'].strftime('%d.%m.%Y %H:%M')}"] + ([f"⚧ Стать: <b>{'Чоловіча' if d.get('sex') == 'M' else 'Жіноча'}</b>"] if r['test_type'] == 'minmult' and d.get('sex') in ('M', 'F') else []) + [""]
     if r['test_type'] == 'pcl5' and cl:
         lines += [f"📈 Сума: <b>{esc(r['score'])}</b> з 80",
                   f"B: {cl['B']}/20 · C: {cl['C']}/8 · D: {cl['D']}/28 · E: {cl['E']}/24",
                   f"Поріг 31–33: {yn(d.get('cutoff_met'))}; DSM-5 (попередньо): {yn(d.get('dsm_provisional'))}"]
+    elif r['test_type'] == 'schmishek' and d.get('profile'):
+        lvl = {'accentuation': 'акцентуація', 'tendency': 'тенденція', 'normal': 'норма'}
+        lines += ["📈 <b>Профіль акцентуацій (бал з 24):</b>"]
+        lines += [f"{esc(p['name'])}: <b>{esc(p['score'])}</b> — {lvl.get(p['level'], '')}" for p in d['profile']]
+        lines += ["", "Акцентуація: понад 19; тенденція: 15–19. Інтерпретує фахівець."]
+    elif r['test_type'] == 'minmult' and d.get('subscales'):
+        v = d.get('validity') or {}
+        ts = d.get('t_scores') or {}
+        tv = d.get('t_validity') or {}
+        mm = lambda n: ('{} ({}) {}'.format(*n.split('_', 2)) if n.count('_') >= 2 else n)
+        order = lambda kv: int(kv[0].split('_')[1]) if kv[0].count('_') >= 2 else 99
+        rows = sorted(d['subscales'].items(), key=order)
+        if ts:
+            lines += ["📈 <b>Шкали: бал (з поправкою на K) · T-бал</b>"]
+            lines += [f"{esc(mm(n))}: <b>{esc(x)}</b> · T={esc(ts.get(n))}" for n, x in rows]
+            lines += ["", f"L: {esc(v.get('L'))} (T={esc(tv.get('L'))}) · F: {esc(v.get('F'))} (T={esc(tv.get('F'))}) · K: {esc(v.get('K'))} (T={esc(tv.get('K'))})",
+                      "T = 50 + 10·(X − M)/σ, норми за статтю. Інтерпретує фахівець."]
+        else:
+            lines += ["📈 <b>Шкали (з поправкою на K):</b>"]
+            lines += [f"{esc(mm(n))}: <b>{esc(x)}</b>" for n, x in rows]
+            lines += ["", f"L: {esc(v.get('L'))} · F: {esc(v.get('F'))} · K: {esc(v.get('K'))}",
+                      "Т-бали не розраховано (стать не вказана); інтерпретує фахівець."]
     else:
         lines += [f"📈 Бал: <b>{esc(r['score'])}</b>", "Інтерпретація потребує фахівця."]
     text = "\n".join(lines)
@@ -530,12 +596,23 @@ async def handle_result_webhook(request):
         severity     = data.get('severity_ua') or '—'
         sev_emoji    = '🟠' if data.get('ptsd_probable') else '⚪'
 
+        if test_type == 'minmult':
+            score_block = "📋 Профіль шкал — у результаті (кнопка нижче).\n\n"
+        elif test_type == 'schmishek':
+            acc = data.get('accentuated_types') or []
+            tend = (data.get('details') or {}).get('tendency_types') or []
+            score_block = (
+                f"🎯 Акцентуації (понад 19): <b>{esc(', '.join(acc) if acc else 'не виявлено', 300)}</b>\n"
+                + (f"〰️ Тенденція (15–19): {esc(', '.join(tend), 300)}\n" if tend else "")
+                + "\n"
+            )
+        else:
+            score_block = f"📈 Бал: <b>{esc(score, 20)}</b>\n🎯 Підсумок: <b>{esc(severity, 300)}</b>\n\n"
         message = (
             f"{sev_emoji} <b>Тест завершено</b>\n\n"
             f"👤 Пацієнт: <b>{esc(patient_name)}</b>\n"
             f"🧪 Тест: {esc(test_name)}\n"
-            f"📈 Бал: <b>{esc(score, 20)}</b>\n"
-            f"🎯 Підсумок: <b>{esc(severity, 300)}</b>\n\n"
+            f"{score_block}"
             f"Кнопками нижче можна переглянути результат або завантажити PDF."
         )
         markup = InlineKeyboardMarkup(inline_keyboard=[
