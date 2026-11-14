@@ -128,8 +128,4 @@ The `/result` URL and the secret are also configured inside n8n (the **HTTP: Not
 
 The instruments implemented here (items, keys and norms) were taken from the sources named above and remain the property of their respective authors. Their licences have not been verified; check the terms before redistributing this material.
 
-This repository is public for transparency and review. **All rights reserved:** no licence to use, copy, modify or distribute the code is granted unless the maintainer adds a `LICENSE` file.
-
-## License
-
-See [LICENSE](LICENSE).
+This repository is public for transparency and review. **All rights reserved:** see [LICENSE](LICENSE). No permission to use, copy, modify or distribute the code is granted beyond what that file states.
