@@ -32,6 +32,47 @@ def _yn(b) -> str:
     return 'так' if b else 'ні'
 
 
+SCREEN_MAX = {'phq9': 27, 'gad7': 21}
+# Пороги (PHQ-9: 5/10/15/20; GAD-7: 5/10/15) НЕ звірено з первинними джерелами (Kroenke 2001; Spitzer 2006).
+_SEV_UA = {
+    'phq9': {'minimal': 'мінімальні або відсутні симптоми', 'mild': 'легкий рівень симптомів',
+             'moderate': 'помірний рівень симптомів', 'moderately_severe': 'помірно тяжкий рівень симптомів',
+             'severe': 'тяжкий рівень симптомів'},
+    'gad7': {'minimal': 'мінімальна тривога', 'mild': 'легка тривога',
+             'moderate': 'помірна тривога', 'severe': 'тяжка тривога'},
+}
+_I9_YES = 'ПУНКТ 9 PHQ-9 > 0 (думки про смерть або самопошкодження): потрібна негайна клінічна оцінка ризику.'
+_I9_UNK = 'Прапорець пункту 9 PHQ-9 не визначено — перевірте відповіді пацієнта вручну.'
+
+
+def severity_ua(test_type, key) -> str:
+    if key is None or key == '':
+        return '—'
+    return _SEV_UA.get(test_type, {}).get(str(key), str(key))
+
+
+def item9_alert(src: dict, d: dict = None) -> tuple:
+    """('yes'|'unknown'|'no', текст). Не PHQ-9 або пункт 9 = 0 -> ('no', '')."""
+    if src.get('test_type') != 'phq9':
+        return 'no', ''
+    d = d or {}
+    for v in (src.get('item9_positive'), d.get('item9_positive')):
+        if v is not None:
+            return ('yes', _I9_YES) if str(v).lower() in ('true', '1') else ('no', '')
+    ans = d.get('answers') or src.get('answers')
+    if isinstance(ans, str):
+        try:
+            ans = json.loads(ans)
+        except ValueError:
+            ans = None
+    if isinstance(ans, list) and len(ans) >= 9:
+        try:
+            return ('yes', _I9_YES) if int(ans[8]) > 0 else ('no', '')
+        except (TypeError, ValueError):
+            pass
+    return 'unknown', _I9_UNK
+
+
 def _grid(data, widths):
     t = Table(data, colWidths=widths)
     t.setStyle(TableStyle([
@@ -133,6 +174,16 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                       Spacer(1, 0.5*cm)]
             text = ('Бали шкал Hs, Pd, Pt, Sc, Ma подано з поправкою на K. '
                     'T-бали не розраховано (стать не вказана). Профіль інтерпретує фахівець.')
+    elif test_type in SCREEN_MAX:
+        i9, alert = item9_alert({**result_data, 'test_type': test_type}, d)
+        if alert:
+            story += [Paragraph(_xe(alert), ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
+                      Spacer(1, 0.5*cm)]
+        story += [_grid([['Рівень:', severity_ua(test_type, result_data.get('severity'))]], [5*cm, 10*cm]),
+                  Spacer(1, 0.5*cm)]
+        text = (f"Сума: {result_data.get('score')} з {SCREEN_MAX[test_type]}. "
+                + (f"Поріг ≥10 досягнуто: {_yn(d.get('cutoff_met'))}. " if test_type == 'gad7' else '')
+                + 'Скринінговий результат не є діагнозом. Потрібна клінічна оцінка фахівця.')
     else:
         text = 'Інтерпретація потребує фахівця.'
 

@@ -48,12 +48,15 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 WEBHOOK_PATH = "/result"
 ADMIN_TG_ID  = int(os.getenv("ADMIN_TG_ID", "0"))
 
-from report import generate_pdf_report, parse_details
+from report import (generate_pdf_report, parse_details, SCREEN_MAX,
+                    item9_alert, severity_ua)
 
 TESTS = {
     "pcl5":      {"name": "PCL-5 (ПТСР)",                    "emoji": "🧠"},
     "minmult":   {"name": "Mini-Mult (скорочений MMPI)", "emoji": "📋"},
     "schmishek": {"name": "Шмішек (акцентуації характеру)", "emoji": "🔍"},
+    "phq9":      {"name": "PHQ-9 (депресія, скринінг)",      "emoji": "📝"},
+    "gad7":      {"name": "GAD-7 (тривога, скринінг)",       "emoji": "📝"},
 }
 
 logging.basicConfig(
@@ -480,6 +483,15 @@ async def cb_view_result(cb: CallbackQuery):
         lines += ["📈 <b>Профіль акцентуацій (бал з 24):</b>"]
         lines += [f"{esc(p['name'])}: <b>{esc(p['score'])}</b> — {lvl.get(p['level'], '')}" for p in d['profile']]
         lines += ["", "Акцентуація: понад 19; тенденція: 15–19. Інтерпретує фахівець."]
+    elif r['test_type'] in SCREEN_MAX:
+        i9, alert = item9_alert(r, d)
+        if alert:
+            lines += [f"<b>{'🚨' if i9 == 'yes' else '⚠️'} {esc(alert)}</b>", ""]
+        lines += [f"📈 Бал: <b>{esc(r['score'])}</b> з {SCREEN_MAX[r['test_type']]}",
+                  f"🎯 Рівень: <b>{esc(severity_ua(r['test_type'], r.get('severity')))}</b>"]
+        if r['test_type'] == 'gad7':
+            lines += [f"Поріг ≥10: {yn(d.get('cutoff_met'))}"]
+        lines += ["", "Скринінг, не діагноз. Інтерпретує фахівець."]
     elif r['test_type'] == 'minmult' and d.get('subscales'):
         v = d.get('validity') or {}
         ts = d.get('t_scores') or {}
@@ -593,8 +605,9 @@ async def handle_result_webhook(request):
         # The patient name comes from the server-side session, not from the request body.
         patient_name = session['full_name'] or '—'
         score        = data.get('score', '—')
-        severity     = data.get('severity_ua') or '—'
-        sev_emoji    = '🟠' if data.get('ptsd_probable') else '⚪'
+        severity     = data.get('severity_ua') or severity_ua(test_type, data.get('severity'))
+        i9, alert    = item9_alert({**data, 'test_type': test_type}, data.get('details') if isinstance(data.get('details'), dict) else {})
+        sev_emoji    = '🔴' if i9 == 'yes' else ('🟠' if data.get('ptsd_probable') else '⚪')
 
         if test_type == 'minmult':
             score_block = "📋 Профіль шкал — у результаті (кнопка нижче).\n\n"
@@ -609,7 +622,8 @@ async def handle_result_webhook(request):
         else:
             score_block = f"📈 Бал: <b>{esc(score, 20)}</b>\n🎯 Підсумок: <b>{esc(severity, 300)}</b>\n\n"
         message = (
-            f"{sev_emoji} <b>Тест завершено</b>\n\n"
+            (f"<b>{'🚨' if i9 == 'yes' else '⚠️'} {esc(alert, 300)}</b>\n\n" if alert else "")
+            + f"{sev_emoji} <b>Тест завершено</b>\n\n"
             f"👤 Пацієнт: <b>{esc(patient_name)}</b>\n"
             f"🧪 Тест: {esc(test_name)}\n"
             f"{score_block}"
