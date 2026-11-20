@@ -219,3 +219,55 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     doc.build(story)
     buf.seek(0)
     return buf
+
+
+_SCREEN_Q = {
+    'phq9': [
+        'Втрата інтересу або задоволення від звичних справ',
+        'Пригнічений настрій, туга або відчуття безнадії',
+        'Проблеми зі сном (безсоння або надмірна сонливість)',
+        'Втома або брак енергії',
+        'Поганий апетит або переїдання',
+        'Низька самооцінка, відчуття провини або невдачі',
+        'Складнощі з концентрацією уваги',
+        'Загальмованість або, навпаки, метушливість',
+        'Думки про смерть або самопошкодження',
+    ],
+    'gad7': [
+        'Нервозність, тривога або напруження',
+        'Неможливість зупинити або контролювати занепокоєння',
+        'Надмірне занепокоєння з різних приводів',
+        'Труднощі з розслабленням',
+        'Неспокійність, важко всидіти на місці',
+        'Легка дратівливість або роздратування',
+        'Відчуття страху, що може трапитися щось жахливе',
+    ],
+}
+_FREQ_UA = ['Зовсім ні', 'Кілька днів', 'Більше половини днів', 'Майже щодня']
+
+
+def item_lines(test_type, src: dict, d: dict = None) -> list:
+    """Рядки '1. Питання — 2 (Більше половини днів)'. [] якщо відповідей немає або кількість не збігається."""
+    qs = _SCREEN_Q.get(test_type)
+    if not qs:
+        return []
+    d = d or {}
+    ans = d.get('answers') or src.get('answers')
+    if isinstance(ans, str):
+        try:
+            ans = json.loads(ans)
+        except ValueError:
+            return []
+    if not isinstance(ans, list) or len(ans) != len(qs):
+        return []
+    out = []
+    for i, (q, a) in enumerate(zip(qs, ans), 1):
+        try:
+            a = int(a)
+        except (TypeError, ValueError):
+            return []
+        if not 0 <= a <= 3:
+            return []
+        flag = ' ⚠️' if (test_type == 'phq9' and i == 9 and a > 0) else ''
+        out.append(f"{i}. {q} — {a} ({_FREQ_UA[a]}){flag}")
+    return out

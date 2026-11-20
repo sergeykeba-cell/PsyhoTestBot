@@ -49,7 +49,7 @@ WEBHOOK_PATH = "/result"
 ADMIN_TG_ID  = int(os.getenv("ADMIN_TG_ID", "0"))
 
 from report import (generate_pdf_report, parse_details, SCREEN_MAX,
-                    item9_alert, severity_ua, gad7_cutoff)
+                    item9_alert, severity_ua, gad7_cutoff, item_lines)
 
 TESTS = {
     "pcl5":      {"name": "PCL-5 (ПТСР)",                    "emoji": "🧠"},
@@ -512,7 +512,41 @@ async def cb_view_result(cb: CallbackQuery):
     else:
         lines += [f"📈 Бал: <b>{esc(r['score'])}</b>", "Інтерпретація потребує фахівця."]
     text = "\n".join(lines)
-    await cb.message.edit_text(text, reply_markup=kb_session_item(token), parse_mode="HTML")
+    markup = kb_session_item(token)
+    if r['test_type'] in SCREEN_MAX:
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 По пунктах", callback_data=f"items:{token}")]
+        ] + list(markup.inline_keyboard))
+    await cb.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("items:"))
+async def cb_view_items(cb: CallbackQuery):
+    token  = cb.data.split(":", 1)[1]
+    result = await get_result(token)
+    if not result:
+        await cb.answer("❌ Результат не знайдено", show_alert=True)
+        return
+    if not await _owns(cb, result):
+        await cb.answer("⛔ Немає доступу", show_alert=True)
+        return
+    import html as _html
+    r = dict(result)
+    d = parse_details(r.get('details'))
+    rows = item_lines(r['test_type'], r, d)
+    test_name = TESTS.get(r['test_type'], {}).get('name', r['test_type'])
+    head = f"📋 <b>Відповіді по пунктах</b>\n🧪 {_html.escape(str(test_name), quote=False)}\n"
+    if rows:
+        body = "\n".join(_html.escape(x, quote=False) for x in rows)
+        foot = f"\n\n📈 Бал: <b>{_html.escape(str(r['score']), quote=False)}</b>"
+    else:
+        body = "Відповіді по пунктах не збережено або недоступні."
+        foot = ""
+    back = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ До результату", callback_data=f"view:{token}")]
+    ])
+    await cb.message.edit_text(head + "\n" + body + foot, reply_markup=back, parse_mode="HTML")
     await cb.answer()
 
 
