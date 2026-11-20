@@ -513,7 +513,7 @@ async def cb_view_result(cb: CallbackQuery):
         lines += [f"📈 Бал: <b>{esc(r['score'])}</b>", "Інтерпретація потребує фахівця."]
     text = "\n".join(lines)
     markup = kb_session_item(token)
-    if r['test_type'] in SCREEN_MAX:
+    if r['test_type'] in TESTS:
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📋 По пунктах", callback_data=f"items:{token}")]
         ] + list(markup.inline_keyboard))
@@ -521,9 +521,27 @@ async def cb_view_result(cb: CallbackQuery):
     await cb.answer()
 
 
+def _paginate_lines(lines, limit=3000):
+    pages, cur, n = [], [], 0
+    for x in lines:
+        if cur and n + len(x) + 1 > limit:
+            pages.append(cur)
+            cur, n = [], 0
+        cur.append(x)
+        n += len(x) + 1
+    if cur:
+        pages.append(cur)
+    return pages
+
+
 @router.callback_query(F.data.startswith("items:"))
 async def cb_view_items(cb: CallbackQuery):
-    token  = cb.data.split(":", 1)[1]
+    parts = cb.data.split(":")
+    token = parts[1]
+    try:
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        page = 0
     result = await get_result(token)
     if not result:
         await cb.answer("❌ Результат не знайдено", show_alert=True)
@@ -535,18 +553,26 @@ async def cb_view_items(cb: CallbackQuery):
     r = dict(result)
     d = parse_details(r.get('details'))
     rows = item_lines(r['test_type'], r, d)
+    pages = _paginate_lines(rows)
+    page = max(0, min(page, len(pages) - 1)) if pages else 0
     test_name = TESTS.get(r['test_type'], {}).get('name', r['test_type'])
-    head = f"📋 <b>Відповіді по пунктах</b>\n🧪 {_html.escape(str(test_name), quote=False)}\n"
-    if rows:
-        body = "\n".join(_html.escape(x, quote=False) for x in rows)
-        foot = f"\n\n📈 Бал: <b>{_html.escape(str(r['score']), quote=False)}</b>"
+    pg = f" (стор. {page + 1}/{len(pages)})" if len(pages) > 1 else ""
+    head = f"📋 <b>Відповіді по пунктах</b>{pg}\n🧪 {_html.escape(str(test_name), quote=False)}\n"
+    if pages:
+        body = "\n".join(_html.escape(x, quote=False) for x in pages[page])
+        scored = r['test_type'] in ('pcl5', 'phq9', 'gad7') and r.get('score') is not None
+        foot = f"\n\n📈 Бал: <b>{_html.escape(str(r['score']), quote=False)}</b>" if scored else ""
     else:
         body = "Відповіді по пунктах не збережено або недоступні."
         foot = ""
-    back = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ До результату", callback_data=f"view:{token}")]
-    ])
-    await cb.message.edit_text(head + "\n" + body + foot, reply_markup=back, parse_mode="HTML")
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀️", callback_data=f"items:{token}:{page - 1}"))
+    if page < len(pages) - 1:
+        nav.append(InlineKeyboardButton(text="▶️", callback_data=f"items:{token}:{page + 1}"))
+    kb = ([nav] if nav else []) + [[InlineKeyboardButton(text="◀️ До результату", callback_data=f"view:{token}")]]
+    await cb.message.edit_text(head + "\n" + body + foot,
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode="HTML")
     await cb.answer()
 
 

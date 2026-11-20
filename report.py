@@ -212,8 +212,9 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     else:
         text = 'Інтерпретація потребує фахівця.'
 
-    story += [Paragraph('ІНТЕРПРЕТАЦІЯ', head), Paragraph(_xe(text), norm), Spacer(1, 1*cm),
-              Paragraph('ЗАСТЕРЕЖЕННЯ', head),
+    story += [Paragraph('ІНТЕРПРЕТАЦІЯ', head), Paragraph(_xe(text), norm), Spacer(1, 1*cm)]
+    story += _items_story(test_type, item_rows(test_type, result_data, d), head, norm)
+    story += [Paragraph('ЗАСТЕРЕЖЕННЯ', head),
               Paragraph('Звіт має інформаційний характер і не є медичним діагнозом. '
                         'Для інтерпретації результатів зверніться до кваліфікованого фахівця.', norm)]
     doc.build(story)
@@ -271,3 +272,181 @@ def item_lines(test_type, src: dict, d: dict = None) -> list:
         flag = ' ⚠️' if (test_type == 'phq9' and i == 9 and a > 0) else ''
         out.append(f"{i}. {q} — {a} ({_FREQ_UA[a]}){flag}")
     return out
+
+
+
+def item_rows(test_type, src: dict, d: dict = None) -> list:
+    # [(№, питання, бал)] або [], якщо відповідей немає чи їх кількість не збігається
+    qs = _SCREEN_Q.get(test_type)
+    if not qs:
+        return []
+    d = d or {}
+    ans = d.get('answers') or src.get('answers')
+    if isinstance(ans, str):
+        try:
+            ans = json.loads(ans)
+        except ValueError:
+            return []
+    if not isinstance(ans, list) or len(ans) != len(qs):
+        return []
+    out = []
+    for i, (q, a) in enumerate(zip(qs, ans), 1):
+        try:
+            a = int(a)
+        except (TypeError, ValueError):
+            return []
+        if not 0 <= a <= 3:
+            return []
+        out.append((i, q, a))
+    return out
+
+
+def _items_story(test_type, rows, head, norm) -> list:
+    if not rows:
+        return []
+    cell = ParagraphStyle('IC', parent=norm, fontSize=9.5, leading=12)
+    bold = ParagraphStyle('IB', parent=cell, fontName='DejaVu-Bold')
+    red = ParagraphStyle('IR', parent=bold, textColor=colors.HexColor('#b91c1c'))
+    data = [[Paragraph('№', bold), Paragraph('Питання', bold),
+             Paragraph('Відповідь', bold), Paragraph('Бал', bold)]]
+    alert_rows = []
+    for i, q, a in rows:
+        flag = test_type == 'phq9' and i == 9 and a > 0
+        stl = red if flag else cell
+        data.append([Paragraph(str(i), stl), Paragraph(_xe(q), stl),
+                     Paragraph(_xe(_FREQ_UA[a]), stl), Paragraph(str(a), stl)])
+        if flag:
+            alert_rows.append(len(data) - 1)
+    data.append([Paragraph('', bold), Paragraph('Сума', bold), Paragraph('', bold),
+                 Paragraph(str(sum(a for _, _, a in rows)), bold)])
+    t = Table(data, colWidths=[1*cm, 8*cm, 4.5*cm, 1.5*cm], repeatRows=1)
+    style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f4f4f5')),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f4f4f5')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]
+    for r in alert_rows:
+        style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#fee2e2')))
+    t.setStyle(TableStyle(style))
+    return [Paragraph('ВІДПОВІДІ ПО ПУНКТАХ', head), t, Spacer(1, 1*cm)]
+
+
+
+# ---- загальний механізм: питання беруться з questions.json (витяг з index.html) ----
+import os as _os
+
+_QFILE = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'questions.json')
+_QCACHE = {'mtime': None, 'data': {}}
+
+
+def _questions_db() -> dict:
+    try:
+        m = _os.path.getmtime(_QFILE)
+    except OSError:
+        return {}
+    if _QCACHE['mtime'] != m:
+        try:
+            with open(_QFILE, encoding='utf-8') as f:
+                _QCACHE['data'] = json.load(f)
+        except (OSError, ValueError):
+            _QCACHE['data'] = {}
+        _QCACHE['mtime'] = m
+    return _QCACHE['data']
+
+
+def _test_spec(test_type):
+    spec = _questions_db().get(test_type)
+    if spec and spec.get('questions'):
+        opts = spec.get('options') or []
+        return spec['questions'], opts, spec.get('values') or list(range(len(opts)))
+    qs = _SCREEN_Q.get(test_type)
+    if qs:
+        return qs, _FREQ_UA, [0, 1, 2, 3]
+    return None
+
+
+def _is_scored(test_type) -> bool:
+    spec = _test_spec(test_type)
+    return bool(spec) and len(spec[2]) > 2
+
+
+def item_rows(test_type, src: dict, d: dict = None) -> list:
+    # [(№, питання, значення, підпис)] або [], якщо відповідей немає чи їх кількість не збігається
+    spec = _test_spec(test_type)
+    if not spec:
+        return []
+    qs, opts, vals = spec
+    d = d or {}
+    ans = d.get('answers') or src.get('answers')
+    if isinstance(ans, str):
+        try:
+            ans = json.loads(ans)
+        except ValueError:
+            return []
+    if not isinstance(ans, list) or len(ans) != len(qs):
+        return []
+    out = []
+    for i, (q, a) in enumerate(zip(qs, ans), 1):
+        try:
+            a = int(a)
+        except (TypeError, ValueError):
+            return []
+        if a not in vals:
+            return []
+        k = vals.index(a)
+        out.append((i, q, a, opts[k] if k < len(opts) else str(a)))
+    return out
+
+
+def item_lines(test_type, src: dict, d: dict = None) -> list:
+    scored = _is_scored(test_type)
+    out = []
+    for i, q, a, label in item_rows(test_type, src, d):
+        flag = ' ⚠️' if (test_type == 'phq9' and i == 9 and a > 0) else ''
+        out.append(f"{i}. {q} — {f'{a} ({label})' if scored else label}{flag}")
+    return out
+
+
+def _items_story(test_type, rows, head, norm) -> list:
+    if not rows:
+        return []
+    scored = _is_scored(test_type)
+    cell = ParagraphStyle('IC', parent=norm, fontSize=9.5, leading=12)
+    bold = ParagraphStyle('IB', parent=cell, fontName='DejaVu-Bold')
+    red = ParagraphStyle('IR', parent=bold, textColor=colors.HexColor('#b91c1c'))
+    hdr = [Paragraph('№', bold), Paragraph('Питання', bold), Paragraph('Відповідь', bold)]
+    if scored:
+        hdr.append(Paragraph('Бал', bold))
+    data, alert_rows = [hdr], []
+    for i, q, a, label in rows:
+        flag = test_type == 'phq9' and i == 9 and a > 0
+        stl = red if flag else cell
+        row = [Paragraph(str(i), stl), Paragraph(_xe(q), stl), Paragraph(_xe(label), stl)]
+        if scored:
+            row.append(Paragraph(str(a), stl))
+        data.append(row)
+        if flag:
+            alert_rows.append(len(data) - 1)
+    if scored:
+        data.append([Paragraph('', bold), Paragraph('Сума', bold), Paragraph('', bold),
+                     Paragraph(str(sum(r[2] for r in rows)), bold)])
+        widths = [1*cm, 9*cm, 4.5*cm, 1.5*cm]
+    else:
+        widths = [1.2*cm, 11.8*cm, 3*cm]
+    t = Table(data, colWidths=widths, repeatRows=1)
+    style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f4f4f5')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]
+    if scored:
+        style.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f4f4f5')))
+    for r in alert_rows:
+        style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#fee2e2')))
+    t.setStyle(TableStyle(style))
+    return [Paragraph('ВІДПОВІДІ ПО ПУНКТАХ', head), t, Spacer(1, 1*cm)]
