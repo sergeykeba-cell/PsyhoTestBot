@@ -57,6 +57,11 @@ TESTS = {
     "schmishek": {"name": "Шмішек (акцентуації характеру)", "emoji": "🔍"},
     "phq9":      {"name": "PHQ-9 (депресія, скринінг)",      "emoji": "📝"},
     "gad7":      {"name": "GAD-7 (тривога, скринінг)",       "emoji": "📝"},
+    "isi": {"name": "ISI (порушення сну)", "emoji": "😴"},
+    "phq15": {"name": "PHQ-15 (соматизація)", "emoji": "🩺"},
+    "pss10": {"name": "PSS-10 (рівень стресу)", "emoji": "⚡"},
+    "who5": {"name": "WHO-5 (індекс благополуччя)", "emoji": "🌱"},
+    "nsi": {"name": "NSI (посткомоційний синдром)", "emoji": "🤕"},
 }
 
 logging.basicConfig(
@@ -560,7 +565,7 @@ async def cb_view_items(cb: CallbackQuery):
     head = f"📋 <b>Відповіді по пунктах</b>{pg}\n🧪 {_html.escape(str(test_name), quote=False)}\n"
     if pages:
         body = "\n".join(_html.escape(x, quote=False) for x in pages[page])
-        scored = r['test_type'] in ('pcl5', 'phq9', 'gad7') and r.get('score') is not None
+        scored = r['test_type'] in ('pcl5', 'phq9', 'gad7', 'isi', 'phq15', 'pss10', 'who5', 'nsi') and r.get('score') is not None
         foot = f"\n\n📈 Бал: <b>{_html.escape(str(r['score']), quote=False)}</b>" if scored else ""
     else:
         body = "Відповіді по пунктах не збережено або недоступні."

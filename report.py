@@ -32,7 +32,7 @@ def _yn(b) -> str:
     return 'так' if b else 'ні'
 
 
-SCREEN_MAX = {'phq9': 27, 'gad7': 21}
+SCREEN_MAX = {'phq9': 27, 'gad7': 21, 'isi': 28, 'phq15': 30, 'pss10': 40, 'who5': 100, 'nsi': 88}
 # Пороги (PHQ-9: 5/10/15/20; GAD-7: 5/10/15) НЕ звірено з первинними джерелами (Kroenke 2001; Spitzer 2006).
 _SEV_UA = {
     'phq9': {'minimal': 'мінімальні або відсутні симптоми', 'mild': 'легкий рівень симптомів',
@@ -450,3 +450,24 @@ def _items_story(test_type, rows, head, norm) -> list:
         style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#fee2e2')))
     t.setStyle(TableStyle(style))
     return [Paragraph('ВІДПОВІДІ ПО ПУНКТАХ', head), t, Spacer(1, 1*cm)]
+
+
+# ---- етап 1: підписи рівнів для нових шкал ----
+_SEV_UA_NEW = {
+    'isi':   {'none': 'немає клінічно значущої безсоння', 'subthreshold': 'субпорогова безсоння',
+              'moderate': 'клінічна безсоння помірної тяжкості', 'severe': 'клінічна безсоння тяжкого ступеня'},
+    'phq15': {'minimal': 'мінімальна соматизація', 'low': 'низький рівень', 'medium': 'середній рівень',
+              'high': 'високий рівень'},
+    'pss10': {'low': 'низький рівень стресу', 'moderate': 'помірний рівень стресу (умовні межі)',
+              'high': 'високий рівень стресу (умовні межі)'},
+    'who5':  {'ok': 'благополуччя в межах норми', 'low': 'знижене благополуччя (≤50)',
+              'very_low': 'дуже низьке благополуччя (≤28), рекомендовано скринінг депресії'},
+    'nsi':   {'pending': 'передано лікарю'},
+}
+_orig_severity_ua = severity_ua
+
+
+def severity_ua(test_type, severity=None, score=None):
+    if test_type in _SEV_UA_NEW:
+        return _SEV_UA_NEW[test_type].get(severity, str(severity or '—'))
+    return _orig_severity_ua(test_type, severity, score)
