@@ -45,9 +45,34 @@ _I9_YES = 'ПУНКТ 9 PHQ-9 > 0 (думки про смерть або сам�
 _I9_UNK = 'Прапорець пункту 9 PHQ-9 не визначено — перевірте відповіді пацієнта вручну.'
 
 
-def severity_ua(test_type, key) -> str:
-    if key is None or key == '':
+def screen_severity(test_type, score):
+    try:
+        s = int(score)
+    except (TypeError, ValueError):
+        return None
+    bands = {'phq9': ((4, 'minimal'), (9, 'mild'), (14, 'moderate'),
+                      (19, 'moderately_severe'), (27, 'severe')),
+             'gad7': ((4, 'minimal'), (9, 'mild'), (14, 'moderate'), (21, 'severe'))}.get(test_type)
+    if not bands or s < 0:
+        return None
+    for hi, k in bands:
+        if s <= hi:
+            return k
+    return None
+
+
+def gad7_cutoff(score) -> str:
+    try:
+        return 'так' if int(score) >= 10 else 'ні'
+    except (TypeError, ValueError):
         return '—'
+
+
+def severity_ua(test_type, key, score=None) -> str:
+    if key is None or key in ('', 'pending'):
+        key = screen_severity(test_type, score)
+        if key is None:
+            return '—'
     return _SEV_UA.get(test_type, {}).get(str(key), str(key))
 
 
@@ -179,10 +204,10 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
         if alert:
             story += [Paragraph(_xe(alert), ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
                       Spacer(1, 0.5*cm)]
-        story += [_grid([['Рівень:', severity_ua(test_type, result_data.get('severity'))]], [5*cm, 10*cm]),
+        story += [_grid([['Рівень:', severity_ua(test_type, result_data.get('severity'), result_data.get('score'))]], [5*cm, 10*cm]),
                   Spacer(1, 0.5*cm)]
         text = (f"Сума: {result_data.get('score')} з {SCREEN_MAX[test_type]}. "
-                + (f"Поріг ≥10 досягнуто: {_yn(d.get('cutoff_met'))}. " if test_type == 'gad7' else '')
+                + (f"Поріг ≥10 досягнуто: {gad7_cutoff(result_data.get('score'))}. " if test_type == 'gad7' else '')
                 + 'Скринінговий результат не є діагнозом. Потрібна клінічна оцінка фахівця.')
     else:
         text = 'Інтерпретація потребує фахівця.'

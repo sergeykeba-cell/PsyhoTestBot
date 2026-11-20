@@ -49,7 +49,7 @@ WEBHOOK_PATH = "/result"
 ADMIN_TG_ID  = int(os.getenv("ADMIN_TG_ID", "0"))
 
 from report import (generate_pdf_report, parse_details, SCREEN_MAX,
-                    item9_alert, severity_ua)
+                    item9_alert, severity_ua, gad7_cutoff)
 
 TESTS = {
     "pcl5":      {"name": "PCL-5 (ПТСР)",                    "emoji": "🧠"},
@@ -488,9 +488,9 @@ async def cb_view_result(cb: CallbackQuery):
         if alert:
             lines += [f"<b>{'🚨' if i9 == 'yes' else '⚠️'} {esc(alert)}</b>", ""]
         lines += [f"📈 Бал: <b>{esc(r['score'])}</b> з {SCREEN_MAX[r['test_type']]}",
-                  f"🎯 Рівень: <b>{esc(severity_ua(r['test_type'], r.get('severity')))}</b>"]
+                  f"🎯 Рівень: <b>{esc(severity_ua(r['test_type'], r.get('severity'), r.get('score')))}</b>"]
         if r['test_type'] == 'gad7':
-            lines += [f"Поріг ≥10: {yn(d.get('cutoff_met'))}"]
+            lines += [f"Поріг ≥10: {gad7_cutoff(r.get('score'))}"]
         lines += ["", "Скринінг, не діагноз. Інтерпретує фахівець."]
     elif r['test_type'] == 'minmult' and d.get('subscales'):
         v = d.get('validity') or {}
@@ -605,7 +605,7 @@ async def handle_result_webhook(request):
         # The patient name comes from the server-side session, not from the request body.
         patient_name = session['full_name'] or '—'
         score        = data.get('score', '—')
-        severity     = data.get('severity_ua') or severity_ua(test_type, data.get('severity'))
+        severity     = data.get('severity_ua') or severity_ua(test_type, data.get('severity'), data.get('score'))
         i9, alert    = item9_alert({**data, 'test_type': test_type}, data.get('details') if isinstance(data.get('details'), dict) else {})
         sev_emoji    = '🔴' if i9 == 'yes' else ('🟠' if data.get('ptsd_probable') else '⚪')
 

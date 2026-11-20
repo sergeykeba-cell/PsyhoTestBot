@@ -571,11 +571,12 @@ function showResult() {
 
 // Кризовий екран: PHQ-9, пункт 9 > 0. Список контактів редагується тут.
 var CRISIS_CONTACTS = ['Екстрена допомога: 112', 'Швидка допомога: 103'];
+var crisisShown = false;
 
 function showCrisisIfNeeded() {
   var t = state.sessionData && state.sessionData.test_type;
-  if (t !== 'phq9' || !(state.answers[8] > 0)) return;
-  if (document.getElementById('crisisOverlay')) return;
+  if (t !== 'phq9' || !(state.answers[8] > 0) || crisisShown) return;
+  crisisShown = true;
   var o = document.createElement('div');
   o.id = 'crisisOverlay';
   o.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#fff;color:#111;padding:24px;overflow:auto;font-size:16px;line-height:1.5;';
