@@ -62,6 +62,7 @@ TESTS = {
     "pss10": {"name": "PSS-10 (рівень стресу)", "emoji": "⚡"},
     "who5": {"name": "WHO-5 (індекс благополуччя)", "emoji": "🌱"},
     "nsi": {"name": "NSI (посткомоційний синдром)", "emoji": "🤕"},
+    "brief_cope": {"name": "Brief COPE (копінг-стратегії)", "emoji": "🛡️"},
 }
 
 logging.basicConfig(
@@ -497,6 +498,18 @@ async def cb_view_result(cb: CallbackQuery):
         if r['test_type'] == 'gad7':
             lines += [f"Поріг ≥10: {gad7_cutoff(r.get('score'))}"]
         lines += ["", "Скринінг, не діагноз. Інтерпретує фахівець."]
+    elif r['test_type'] == 'brief_cope' and d.get('subscales'):
+        sub = d['subscales']
+        lines += ["📈 <b>Профіль копінгу (підшкали, 0–6):</b>"]
+        lines += [f"{esc(str(k).replace('_', ' '))}: <b>{esc(v)}</b>"
+                  for k, v in sorted(sub.items(), key=lambda kv: -kv[1])]
+        mac = d.get('macro')
+        if mac:
+            lines += ["", "Умовне групування (середнє 0–3):"]
+            lines += [f"{esc(k)}: <b>{esc(m.get('mean'))}</b>" for k, m in mac.items()]
+        if d.get('substance_flag'):
+            lines += ["", "⚠️ Підшкала «Вживання речовин» ≥ 3 з 6 — зверніть увагу."]
+        lines += ["", "Порогів немає. Інтерпретує фахівець."]
     elif r['test_type'] == 'minmult' and d.get('subscales'):
         v = d.get('validity') or {}
         ts = d.get('t_scores') or {}
@@ -683,6 +696,14 @@ async def handle_result_webhook(request):
                 f"🎯 Акцентуації (понад 19): <b>{esc(', '.join(acc) if acc else 'не виявлено', 300)}</b>\n"
                 + (f"〰️ Тенденція (15–19): {esc(', '.join(tend), 300)}\n" if tend else "")
                 + "\n"
+            )
+        elif test_type == 'brief_cope':
+            _dt = data.get('details') if isinstance(data.get('details'), dict) else {}
+            _top = _dt.get('top3') or []
+            score_block = (
+                f"🛡️ Найвиразніші стратегії: <b>{esc(', '.join(_top) if _top else '—', 300)}</b>\n"
+                + ("⚠️ Вживання речовин ≥ 3 з 6\n" if _dt.get('substance_flag') else "")
+                + "Повний профіль — у результаті (кнопка нижче).\n\n"
             )
         else:
             score_block = f"📈 Бал: <b>{esc(score, 20)}</b>\n🎯 Підсумок: <b>{esc(severity, 300)}</b>\n\n"

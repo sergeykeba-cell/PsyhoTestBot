@@ -140,16 +140,16 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     story = [Paragraph('ЗВІТ ПРО ТЕСТУВАННЯ', title), Paragraph(_xe(test_name), head),
              Spacer(1, 0.5*cm),
              _grid([['Пацієнт:', str(result_data.get('patient_name') or '—')],
-                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
+                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek', 'brief_cope') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
              Spacer(1, 1*cm)]
 
     if test_type == 'pcl5' and cl:
         story += [Paragraph('КЛАСТЕРИ', head),
-                  _grid([['B (вторгнення)', f"{cl['B']} з 20"], ['C (уникнення)', f"{cl['C']} з 8"],
-                         ['D (когніції/настрій)', f"{cl['D']} з 28"],
-                         ['E (збудження)', f"{cl['E']} з 24"]], [7*cm, 8*cm]),
+                  _grid([['B (вторгнення)', f"{cl['B']} / 20"], ['C (уникнення)', f"{cl['C']} / 8"],
+                         ['D (когніції/настрій)', f"{cl['D']} / 28"],
+                         ['E (збудження)', f"{cl['E']} / 24"]], [7*cm, 8*cm]),
                   Spacer(1, 0.5*cm)]
-        text = (f"Сума: {result_data.get('score')} з 80. Орієнтовний поріг ймовірного ПТСР (31–33) "
+        text = (f"Сума: {result_data.get('score')} / 80. Орієнтовний поріг ймовірного ПТСР (31–33) "
                 f"досягнуто: {_yn(d.get('cutoff_met'))}. Попередній критерій DSM-5 "
                 f"(≥1 B, ≥1 C, ≥2 D, ≥2 E при оцінці ≥2): {_yn(d.get('dsm_provisional'))}. "
                 "PCL-5 є скринінговим інструментом: діагноз встановлює лише клініцист.")
@@ -206,11 +206,25 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                       Spacer(1, 0.5*cm)]
         story += [_grid([['Рівень:', severity_ua(test_type, result_data.get('severity'), result_data.get('score'))]], [5*cm, 10*cm]),
                   Spacer(1, 0.5*cm)]
-        text = (f"Сума: {result_data.get('score')} з {SCREEN_MAX[test_type]}. "
+        text = (f"Сума: {result_data.get('score')} / {SCREEN_MAX[test_type]}. "
                 + (f"Поріг ≥10 досягнуто: {gad7_cutoff(result_data.get('score'))}. " if test_type == 'gad7' else '')
                 + 'Скринінговий результат не є діагнозом. Потрібна клінічна оцінка фахівця.')
     else:
         text = 'Інтерпретація потребує фахівця.'
+        _sub = d.get('subscales') if isinstance(d, dict) else None  # _SUBSCALES_PDF
+        if _sub:
+            story += [Paragraph('ПІДШКАЛИ', head),
+                      _grid([[str(k).replace('_', ' '), str(v)] for k, v in sorted(_sub.items(), key=lambda kv: -kv[1])], [9*cm, 6*cm]),
+                      Spacer(1, 0.5*cm)]
+            _mac = d.get('macro')
+            if _mac:
+                story += [Paragraph('УМОВНЕ ГРУПУВАННЯ (середнє 0–3)', head),
+                          _grid([[str(k), str(m.get('mean'))] for k, m in _mac.items()], [9*cm, 6*cm]),
+                          Spacer(1, 0.5*cm)]
+            if d.get('substance_flag'):
+                story += [Paragraph(_xe('Увага: підшкала «Вживання речовин» ≥ 3 з 6.'), norm), Spacer(1, 0.3*cm)]
+            text = ('Кожна підшкала — сума двох пунктів (0–6). Клінічних порогів немає: '
+                    'профіль показує, які стратегії обираються частіше, і оцінюється фахівцем.')
 
     story += [Paragraph('ІНТЕРПРЕТАЦІЯ', head), Paragraph(_xe(text), norm), Spacer(1, 1*cm)]
     story += _items_story(test_type, item_rows(test_type, result_data, d), head, norm)
@@ -317,7 +331,7 @@ def _items_story(test_type, rows, head, norm) -> list:
                      Paragraph(_xe(_FREQ_UA[a]), stl), Paragraph(str(a), stl)])
         if flag:
             alert_rows.append(len(data) - 1)
-    data.append([Paragraph('', bold), Paragraph('Сума', bold), Paragraph('', bold),
+    data.append([Paragraph('', bold), Paragraph(_SUM_LABEL.get(test_type, 'Сума'), bold), Paragraph('', bold),
                  Paragraph(str(sum(a for _, _, a in rows)), bold)])
     t = Table(data, colWidths=[1*cm, 8*cm, 4.5*cm, 1.5*cm], repeatRows=1)
     style = [
@@ -431,7 +445,7 @@ def _items_story(test_type, rows, head, norm) -> list:
         if flag:
             alert_rows.append(len(data) - 1)
     if scored:
-        data.append([Paragraph('', bold), Paragraph('Сума', bold), Paragraph('', bold),
+        data.append([Paragraph('', bold), Paragraph(_SUM_LABEL.get(test_type, 'Сума'), bold), Paragraph('', bold),
                      Paragraph(str(sum(r[2] for r in rows)), bold)])
         widths = [1*cm, 9*cm, 4.5*cm, 1.5*cm]
     else:
@@ -471,3 +485,19 @@ def severity_ua(test_type, severity=None, score=None):
     if test_type in _SEV_UA_NEW:
         return _SEV_UA_NEW[test_type].get(severity, str(severity or '—'))
     return _orig_severity_ua(test_type, severity, score)
+
+_SEV_UA_NEW['brief_cope'] = {'pending': 'передано лікарю'}
+
+
+# ---- виправлення 3 ----
+_SUM_LABEL = {
+    'who5':  'Сума сирих балів (індекс = ×4)',
+    'pss10': 'Сума сирих балів (без обернення пунктів 4, 5, 7, 8)',
+}
+_orig_is_scored = _is_scored
+
+
+def _is_scored(test_type) -> bool:
+    if test_type == 'brief_cope':
+        return False
+    return _orig_is_scored(test_type)
