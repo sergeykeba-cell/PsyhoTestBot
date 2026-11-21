@@ -55,7 +55,7 @@ docker run -d --name n8n --restart always -p 5678:5678 \
   -e GENERIC_TIMEZONE=Europe/Kiev \
   n8nio/n8n
 
-# Then open http://YOUR_IP:5678 and import n8n/workflow.json
+# Then open http://YOUR_IP:5678 and import workflow.json
 # Update PostgreSQL credentials in all DB nodes
 # Set "HTTP: Notify Doctor" URL to http://localhost:8080/result
 # Activate the workflow
