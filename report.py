@@ -78,7 +78,7 @@ def severity_ua(test_type, key, score=None) -> str:
 
 def item9_alert(src: dict, d: dict = None) -> tuple:
     """('yes'|'unknown'|'no', текст). Не PHQ-9 або пункт 9 = 0 -> ('no', '')."""
-    if src.get('test_type') != 'phq9':
+    if src.get('test_type') not in ('phq9', 'express'):
         return 'no', ''
     d = d or {}
     for v in (src.get('item9_positive'), d.get('item9_positive')):
@@ -140,7 +140,7 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     story = [Paragraph('ЗВІТ ПРО ТЕСТУВАННЯ', title), Paragraph(_xe(test_name), head),
              Spacer(1, 0.5*cm),
              _grid([['Пацієнт:', str(result_data.get('patient_name') or '—')],
-                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek', 'brief_cope', 'c_ssrs') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
+                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}[(d.get('sex') or d.get('sex_used'))]]] if test_type != 'minmult' and (d.get('sex') or d.get('sex_used')) in ('M', 'F') else []) + ([] if test_type in ('minmult', 'schmishek', 'brief_cope', 'c_ssrs', 'express') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
              Spacer(1, 1*cm)]
 
     if test_type == 'pcl5' and cl:
@@ -217,6 +217,18 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                       Spacer(1, 0.5*cm)]
             text = ('Скринінг не є діагнозом. Оцінку суїцидального ризику та подальші дії визначає фахівець. '
                     'Пункти 3–5 ставляться лише за відповіді «Так» на пункт 2.')
+        if test_type == 'express':
+            _sc = (d or {}).get('scales') or []
+            if (d or {}).get('item9_positive'):
+                story += [Paragraph(_xe('Увага: позитивна відповідь на пункт 9 PHQ-9 — потрібна пріоритетна оцінка суїцидального ризику.'),
+                                    ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
+                          Spacer(1, 0.5*cm)]
+            if _sc:
+                story += [Paragraph('ЗВЕДЕНИЙ ЗВІТ ПО ШКАЛАХ', head),
+                          _grid([[x.get('name', ''), f"{x.get('score')} / {x.get('max')} — {x.get('level_ua')}"] for x in _sc], [6*cm, 9*cm]),
+                          Spacer(1, 0.5*cm)]
+            text = ('Комплексний скринінг об’єднує PHQ-9, GAD-7, ISI та AUDIT-C. Кожна шкала оцінюється окремо, '
+                    'загального балу немає. Результат не є діагнозом, оцінку виконує фахівець.')
         _sub = d.get('subscales') if isinstance(d, dict) else None  # _SUBSCALES_PDF
         if _sub:
             story += [Paragraph('ПІДШКАЛИ', head),
@@ -583,3 +595,33 @@ def item_rows(test_type, src, d=None):
         for k in (2, 3, 4):
             rows[k] = (rows[k][0], rows[k][1], 0, 'Не ставилося (п. 2 — «Ні»)')
     return rows
+
+
+# ---- етап 4: комплексний експрес-скринінг ----
+_SEV_UA_NEW['express'] = {'none': 'ознак не виявлено', 'attention': 'легкі прояви за однією зі шкал',
+                          'elevated': 'є клінічно значущі шкали', 'high': 'виражені прояви за однією зі шкал'}
+_orig_is_scored_4 = _is_scored
+
+
+def _is_scored(test_type) -> bool:
+    if test_type == 'express':
+        return False
+    return _orig_is_scored_4(test_type)
+
+
+_orig_item9_alert = item9_alert
+
+
+def item9_alert(res, d=None):
+    if (res or {}).get('test_type') == 'express':
+        dd = d if isinstance(d, dict) else {}
+        pos = res.get('item9_positive')
+        if pos is None:
+            pos = dd.get('item9_positive')
+        if pos is None:
+            ans = _qopt_answers(res, dd)
+            pos = isinstance(ans, list) and len(ans) > 8 and ans[8] > 0
+        if pos:
+            return ('yes', 'Позитивна відповідь на пункт 9 PHQ-9 (комплексний скринінг): потрібна пріоритетна оцінка суїцидального ризику.')
+        return (None, None)
+    return _orig_item9_alert(res, d)

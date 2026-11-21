@@ -66,6 +66,7 @@ TESTS = {
     "audit_c": {"name": "AUDIT-C (скринінг алкоголю)", "emoji": "🍷"},
     "audit": {"name": "AUDIT (вживання алкоголю)", "emoji": "🍷"},
     "c_ssrs": {"name": "C-SSRS (суїцидальний ризик)", "emoji": "🆘"},
+    "express": {"name": "Комплексний експрес-скринінг", "emoji": "📋"},
 }
 
 logging.basicConfig(
@@ -196,6 +197,7 @@ def kb_main_menu() -> InlineKeyboardMarkup:
 
 TEST_GROUPS = [
     ("trauma",  "🧠 Травма та суїцидальний ризик", ["pcl5", "c_ssrs"]),
+    ("express", "📋 Комплексний скринінг", ["express"]),
     ("mood",    "📝 Настрій і тривога",            ["phq9", "gad7", "who5"]),
     ("sleep",   "😴 Сон, стрес, соматика",         ["isi", "pss10", "phq15", "nsi"]),
     ("alcohol", "🍷 Алкоголь",                     ["audit_c", "audit"]),
@@ -336,7 +338,7 @@ async def handle_patient_name(msg: Message, state: FSMContext):
         return
     data = await state.get_data()
     await state.update_data(patient_name=name)
-    if data['test_type'] in ('minmult', 'audit_c', 'phq15'):  # SEX_TESTS
+    if data['test_type'] in ('minmult', 'audit_c', 'phq15', 'express'):  # SEX_TESTS
         await state.set_state(NewTest.choosing_sex)
         await msg.answer(
             f"👤 Пацієнт: <b>{_h(name)}</b>\n\n"
@@ -558,7 +560,7 @@ async def cb_view_result(cb: CallbackQuery):
     lines = ["📊 <b>Результат тесту</b>", "",
              f"👤 Пацієнт: <b>{esc(r['patient_name'])}</b>",
              f"🧪 Тест: {esc(test_name)}",
-             f"📅 Дата: {r['completed_at'].strftime('%d.%m.%Y %H:%M')}"] + ([f"⚧ Стать: <b>{'Чоловіча' if d.get('sex') == 'M' else 'Жіноча'}</b>"] if r['test_type'] == 'minmult' and d.get('sex') in ('M', 'F') else []) + [""]
+             f"📅 Дата: {r['completed_at'].strftime('%d.%m.%Y %H:%M')}"] + ([f"⚧ Стать: <b>{'Чоловіча' if (d.get('sex') or d.get('sex_used')) == 'M' else 'Жіноча'}</b>"] if r['test_type'] != 'minmult' and (d.get('sex') or d.get('sex_used')) in ('M', 'F') else []) + ([f"⚧ Стать: <b>{'Чоловіча' if d.get('sex') == 'M' else 'Жіноча'}</b>"] if r['test_type'] == 'minmult' and d.get('sex') in ('M', 'F') else []) + [""]
     if r['test_type'] == 'pcl5' and cl:
         lines += [f"📈 Сума: <b>{esc(r['score'])}</b> з 80",
                   f"B: {cl['B']}/20 · C: {cl['C']}/8 · D: {cl['D']}/28 · E: {cl['E']}/24",
@@ -577,6 +579,12 @@ async def cb_view_result(cb: CallbackQuery):
         if r['test_type'] == 'gad7':
             lines += [f"Поріг ≥10: {gad7_cutoff(r.get('score'))}"]
         lines += ["", "Скринінг, не діагноз. Інтерпретує фахівець."]
+    elif r['test_type'] == 'express' and d.get('scales'):
+        lines += ["📋 <b>Комплексний скринінг: зведення по шкалах</b>", ""]
+        lines += [f"{esc(x.get('name'))}: <b>{esc(x.get('score'))}</b>/{esc(x.get('max'))} — {esc(x.get('level_ua'))}" for x in d['scales']]
+        if d.get('item9_positive'):
+            lines += ["", "🚨 Позитивна відповідь на пункт 9 PHQ-9 — потрібна пріоритетна оцінка суїцидального ризику."]
+        lines += ["", "Загального балу немає. Скринінг, не діагноз. Інтерпретує фахівець."]
     elif r['test_type'] == 'c_ssrs':
         lines += [f"🆘 <b>Суїцидальний ризик: {esc(severity_ua(r['test_type'], r.get('severity'), r.get('score')))}</b>", ""]
         _yes = d.get('yes_items') or []
@@ -784,6 +792,14 @@ async def handle_result_webhook(request):
                 + (f"〰️ Тенденція (15–19): {esc(', '.join(tend), 300)}\n" if tend else "")
                 + "\n"
             )
+        elif test_type == 'express':
+            _dt = data.get('details') if isinstance(data.get('details'), dict) else {}
+            _sc = _dt.get('scales') or []
+            score_block = (
+                "📋 <b>Зведення по шкалах:</b>\n"
+                + "".join(f"• {esc(x.get('name'), 40)}: <b>{esc(x.get('score'), 10)}</b>/{esc(x.get('max'), 10)} — {esc(x.get('level_ua'), 80)}\n" for x in _sc)
+                + "\nПовний звіт — у результаті (кнопка нижче).\n\n"
+            )
         elif test_type == 'c_ssrs':
             _lvl = data.get('severity')
             _icon = {'high': '🚨', 'moderate': '⚠️', 'low': '🟡', 'none': '⚪'}.get(_lvl, '⚪')
@@ -814,7 +830,7 @@ async def handle_result_webhook(request):
             [InlineKeyboardButton(text="📊 Переглянути результат",   callback_data=f"view:{token}")],
             [InlineKeyboardButton(text="📥 Завантажити PDF",  callback_data=f"pdf:{token}")],
         ])
-        if test_type == 'phq9' and (i9 == 'yes' or data.get('item9_positive')):
+        if test_type in ('phq9', 'express') and (i9 == 'yes' or data.get('item9_positive')):
             markup = InlineKeyboardMarkup(inline_keyboard=markup.inline_keyboard + [
                 [InlineKeyboardButton(text="🆘 Призначити C-SSRS", callback_data=f"cssrs:{token}")]])
         await bot.send_message(doctor['telegram_id'], message, parse_mode="HTML", reply_markup=markup)
