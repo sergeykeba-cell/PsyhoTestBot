@@ -501,12 +501,50 @@ async def cmd_sessions(event, state: FSMContext):
             text += f"• <b>{_h(r['patient_name'])}</b> — {_h(test_name)}\n"
             text += f"  <code>{_h(str(r['token'])[:8])}...</code> · {created}\n\n"
     markup = kb_main_menu()
+    if rows:
+        link_rows = [[InlineKeyboardButton(
+            text=f"🔗 {str(r['patient_name'])[:20]} · {str(r['token'])[:6]}",
+            callback_data=f"link:{r['token']}")] for r in rows[:20]]
+        markup = InlineKeyboardMarkup(inline_keyboard=link_rows + list(markup.inline_keyboard))
 
     if isinstance(event, CallbackQuery):
         await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await event.answer()
     else:
         await event.answer(text, reply_markup=markup, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("link:"))
+async def cb_resend_link(cb: CallbackQuery):
+    token = cb.data.split(":", 1)[1]
+    session = await get_session(token)
+    if not session:
+        await cb.answer("❌ Сесію не знайдено", show_alert=True)
+        return
+    session = dict(session)
+    pool = await get_db()
+    doctor = await pool.fetchrow("SELECT telegram_id FROM doctors WHERE id = $1", session['doctor_id'])
+    if not doctor or doctor['telegram_id'] != cb.from_user.id:
+        await cb.answer("⛔ Немає доступу", show_alert=True)
+        return
+    if session.get('status') != 'pending':
+        await cb.answer("Тест уже завершено, посилання неактивне", show_alert=True)
+        return
+    test_url = f"{MINI_APP_URL}?token={token}"
+    qr_bytes = await generate_qr_bytes(test_url)
+    test_name = TESTS.get(session['test_type'], {}).get('name', session['test_type'])
+    await cb.message.answer_photo(
+        photo=BufferedInputFile(qr_bytes, filename=f"test_{token[:8]}.png"),
+        caption=(
+            f"🔗 <b>Посилання на тест</b>\n\n"
+            f"👤 Пацієнт: <b>{_h(session['full_name'])}</b>\n"
+            f"🧪 Тест: <b>{_h(test_name)}</b>\n\n"
+            f"<code>{_h(test_url)}</code>\n\n"
+            f"⚠️ <i>Одноразове посилання: діє до завершення тесту</i>"
+        ),
+        parse_mode="HTML"
+    )
+    await cb.answer()
 
 
 @router.callback_query(F.data == "menu:completed")
@@ -625,11 +663,20 @@ async def cb_view_result(cb: CallbackQuery):
         lines += [f"📈 Бал: <b>{esc(r['score'])}</b>", "Інтерпретація потребує фахівця."]
     text = "\n".join(lines)
     markup = kb_session_item(token)
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        row for row in markup.inline_keyboard
+        if not any((b.callback_data or '').startswith('view:') for b in row)
+    ])
     if r['test_type'] in TESTS:
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📋 По пунктах", callback_data=f"items:{token}")]
         ] + list(markup.inline_keyboard))
-    await cb.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    from aiogram.exceptions import TelegramBadRequest
+    try:
+        await cb.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
     await cb.answer()
 
 
