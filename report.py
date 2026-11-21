@@ -32,7 +32,7 @@ def _yn(b) -> str:
     return 'так' if b else 'ні'
 
 
-SCREEN_MAX = {'phq9': 27, 'gad7': 21, 'isi': 28, 'phq15': 30, 'pss10': 40, 'who5': 100, 'nsi': 88}
+SCREEN_MAX = {'phq9': 27, 'gad7': 21, 'isi': 28, 'phq15': 30, 'pss10': 40, 'who5': 100, 'nsi': 88, 'audit_c': 12, 'audit': 40}
 # Пороги (PHQ-9: 5/10/15/20; GAD-7: 5/10/15) НЕ звірено з первинними джерелами (Kroenke 2001; Spitzer 2006).
 _SEV_UA = {
     'phq9': {'minimal': 'мінімальні або відсутні симптоми', 'mild': 'легкий рівень симптомів',
@@ -140,7 +140,7 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
     story = [Paragraph('ЗВІТ ПРО ТЕСТУВАННЯ', title), Paragraph(_xe(test_name), head),
              Spacer(1, 0.5*cm),
              _grid([['Пацієнт:', str(result_data.get('patient_name') or '—')],
-                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek', 'brief_cope') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
+                    ['Дата:', done.strftime('%d.%m.%Y %H:%M')]] + ([] if test_type in ('minmult', 'schmishek', 'brief_cope', 'c_ssrs') else [['Загальний бал:', str(result_data.get('score', '—'))]]) + ([['Стать:', {'M': 'Чоловіча', 'F': 'Жіноча'}.get(d.get('sex'), '—')]] if test_type == 'minmult' and d.get('sex') in ('M', 'F') else []), [5*cm, 10*cm]),
              Spacer(1, 1*cm)]
 
     if test_type == 'pcl5' and cl:
@@ -211,6 +211,12 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                 + 'Скринінговий результат не є діагнозом. Потрібна клінічна оцінка фахівця.')
     else:
         text = 'Інтерпретація потребує фахівця.'
+        if test_type == 'c_ssrs':
+            story += [Paragraph(_xe('Суїцидальний ризик: ' + severity_ua(test_type, result_data.get('severity'), result_data.get('score'))),
+                                ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
+                      Spacer(1, 0.5*cm)]
+            text = ('Скринінг не є діагнозом. Оцінку суїцидального ризику та подальші дії визначає фахівець. '
+                    'Пункти 3–5 ставляться лише за відповіді «Так» на пункт 2.')
         _sub = d.get('subscales') if isinstance(d, dict) else None  # _SUBSCALES_PDF
         if _sub:
             story += [Paragraph('ПІДШКАЛИ', head),
@@ -501,3 +507,79 @@ def _is_scored(test_type) -> bool:
     if test_type == 'brief_cope':
         return False
     return _orig_is_scored(test_type)
+
+
+# ---- етап 3а: AUDIT-C / AUDIT і варіанти відповідей на рівні питання ----
+_SEV_UA_NEW['audit_c'] = {'negative': 'негативний скринінг (<3)', 'borderline': 'позитивний для жінок (≥3), для чоловіків нижче порога',
+                          'positive': 'позитивний скринінг (≥4)'}
+_SEV_UA_NEW['audit'] = {'low_risk': 'низький ризик', 'hazardous': 'ризиковане вживання', 'harmful': 'шкідливе вживання',
+                        'dependence': 'імовірна залежність (потрібна оцінка фахівця)'}
+
+
+def _has_qopt(test_type) -> bool:
+    return bool((_questions_db().get(test_type) or {}).get('qoptions'))
+
+
+def _qopt_answers(src, d):
+    ans = (d or {}).get('answers') or (src or {}).get('answers')
+    if isinstance(ans, str):
+        try:
+            ans = json.loads(ans)
+        except ValueError:
+            return None
+    return ans
+
+
+_orig_item_rows = item_rows
+
+
+def item_rows(test_type, src, d=None):
+    if not _has_qopt(test_type):
+        return _orig_item_rows(test_type, src, d)
+    spec = _questions_db()[test_type]
+    qs, qo = spec['questions'], spec['qoptions']
+    ans = _qopt_answers(src, d)
+    if not isinstance(ans, list) or len(ans) != len(qs):
+        return []
+    rows = []
+    for i, (q, a) in enumerate(zip(qs, ans)):
+        o = qo[i]
+        try:
+            label = o['options'][o['values'].index(a)]
+        except (ValueError, IndexError):
+            label = str(a)
+        rows.append((i + 1, q, a, label))
+    return rows
+
+
+_orig_item_lines = item_lines
+
+
+def item_lines(test_type, src, d=None):
+    if not _has_qopt(test_type):
+        return _orig_item_lines(test_type, src, d)
+    return [f"{i}. {q} — {a} ({label})" for i, q, a, label in item_rows(test_type, src, d)]
+
+
+_orig_is_scored_3a = _is_scored
+
+
+def _is_scored(test_type) -> bool:
+    if test_type in ('audit_c', 'audit'):
+        return True
+    return _orig_is_scored_3a(test_type)
+
+
+# ---- етап 3б: C-SSRS ----
+_SEV_UA_NEW['c_ssrs'] = {'none': 'ознак ризику не виявлено', 'low': 'низький (пп. 1–2)',
+                         'moderate': 'помірний (п. 3 або минула поведінка)',
+                         'high': 'ВИСОКИЙ (наміри/план або поведінка за останні 3 міс.)'}
+_orig_item_rows_3b = item_rows
+
+
+def item_rows(test_type, src, d=None):
+    rows = _orig_item_rows_3b(test_type, src, d)
+    if test_type == 'c_ssrs' and len(rows) == 6 and rows[1][2] == 0:
+        for k in (2, 3, 4):
+            rows[k] = (rows[k][0], rows[k][1], 0, 'Не ставилося (п. 2 — «Ні»)')
+    return rows

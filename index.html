@@ -500,6 +500,7 @@ const TESTS = {
       "Втома або брак енергії",
       "Проблеми зі сном"
     ].map(function(q){return "За останні 4 тижні, наскільки вас турбувало: "+q;}),
+    skip:function(ans,i,sd){ return i===3 && !!sd && sd.sex==='M'; },
     getSeverity:function(){return{key:"pending",label:"Передано лікарю",cls:""};}
   },
   pss10: {
@@ -606,6 +607,81 @@ const TESTS = {
       "кепкували з ситуації"
     ].map(function(q){return "У складній для вас ситуації останнім часом ви: "+q;}),
     getSeverity:function(){return{key:"pending",label:"Передано лікарю",cls:""};}
+  },
+  audit_c: {
+    name:"AUDIT-C (скринінг алкоголю)", emoji:"🍷",
+    desc:"Короткий скринінг вживання алкоголю за останній рік",
+    time:"1 хвилина",
+    options:["Ніколи", "Раз на місяць або рідше", "2–4 рази на місяць", "2–3 рази на тиждень", "4 і більше разів на тиждень"],
+    values:[0, 1, 2, 3, 4],
+    qoptions:[
+      {"options": ["Ніколи", "Раз на місяць або рідше", "2–4 рази на місяць", "2–3 рази на тиждень", "4 і більше разів на тиждень"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["1–2", "3–4", "5–6", "7–9", "10 і більше"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]}
+    ],
+    questions:[
+      "Як часто ви вживаєте алкогольні напої?",
+      "Скільки порцій алкоголю ви зазвичай випиваєте за один день, коли п’єте? (1 порція ≈ 10 г чистого спирту: ~250 мл пива, ~100 мл вина або ~30 мл міцного напою)",
+      "Як часто ви випиваєте 6 і більше порцій за один раз?"
+    ],
+    getSeverity:function(){return{key:"pending",label:"Передано лікарю",cls:""};}
+  },
+  audit: {
+    name:"AUDIT (вживання алкоголю)", emoji:"🍷",
+    desc:"Повний опитувальник ВООЗ щодо вживання алкоголю за останній рік",
+    time:"3 хвилини",
+    options:["Ніколи", "Раз на місяць або рідше", "2–4 рази на місяць", "2–3 рази на тиждень", "4 і більше разів на тиждень"],
+    values:[0, 1, 2, 3, 4],
+    qoptions:[
+      {"options": ["Ніколи", "Раз на місяць або рідше", "2–4 рази на місяць", "2–3 рази на тиждень", "4 і більше разів на тиждень"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["1–2", "3–4", "5–6", "7–9", "10 і більше"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ніколи", "Рідше ніж раз на місяць", "Щомісяця", "Щотижня", "Щодня або майже щодня"], "values": [0, 1, 2, 3, 4]},
+      {"options": ["Ні", "Так, але не протягом останнього року", "Так, протягом останнього року"], "values": [0, 2, 4]},
+      {"options": ["Ні", "Так, але не протягом останнього року", "Так, протягом останнього року"], "values": [0, 2, 4]}
+    ],
+    questions:[
+      "Як часто ви вживаєте алкогольні напої?",
+      "Скільки порцій алкоголю ви зазвичай випиваєте за один день, коли п’єте? (1 порція ≈ 10 г чистого спирту: ~250 мл пива, ~100 мл вина або ~30 мл міцного напою)",
+      "Як часто ви випиваєте 6 і більше порцій за один раз?",
+      "Як часто протягом останнього року ви виявляли, що не можете припинити пити, почавши?",
+      "Як часто протягом останнього року через вживання алкоголю ви не змогли зробити те, що від вас очікувалось?",
+      "Як часто протягом останнього року вам потрібно було випити зранку, щоб прийти до тями після вчорашнього?",
+      "Як часто протягом останнього року ви відчували провину чи докори сумління після вживання алкоголю?",
+      "Як часто протягом останнього року ви не могли пригадати, що було напередодні, через вживання алкоголю?",
+      "Чи траплялося, що ви або хтось інший отримав травму внаслідок вживання вами алкоголю?",
+      "Чи турбувався про ваше вживання алкоголю родич, друг, лікар або інший медичний працівник, чи радив скоротити вживання?"
+    ],
+    getSeverity:function(){return{key:"pending",label:"Передано лікарю",cls:""};}
+  },
+  c_ssrs: {
+    name:"C-SSRS (суїцидальний ризик)", emoji:"🆘",
+    desc:"Скринінг суїцидального ризику (призначається лікарем)",
+    time:"1-2 хвилини",
+    options:["Ні", "Так"],
+    values:[0, 1],
+    qoptions:[
+      {"options": ["Ні", "Так"], "values": [0, 1]},
+      {"options": ["Ні", "Так"], "values": [0, 1]},
+      {"options": ["Ні", "Так"], "values": [0, 1]},
+      {"options": ["Ні", "Так"], "values": [0, 1]},
+      {"options": ["Ні", "Так"], "values": [0, 1]},
+      {"options": ["Ні", "Так, понад 3 місяці тому", "Так, протягом останніх 3 місяців"], "values": [0, 1, 2]}
+    ],
+    questions:[
+      "Чи бажали ви за останній місяць померти або заснути й не прокинутися?",
+      "Чи виникали у вас за останній місяць реальні думки про те, щоб убити себе?",
+      "Чи думали ви за останній місяць про те, як саме ви могли б це зробити?",
+      "Чи були у вас за останній місяць ці думки разом із певним наміром їх здійснити?",
+      "Чи починали ви за останній місяць розробляти або вже розробили деталі того, як убити себе? Чи маєте намір реалізувати цей план?",
+      "Чи робили ви коли-небудь щось, починали робити або готувалися робити щось, щоб покласти край власному життю? (наприклад: збирали таблетки, купували зброю, роздавали цінні речі, писали прощальну записку, брали зброю, але передумали)"
+    ],
+    skip:function(ans,i){ return i>=2 && i<=4 && ans[1]!==1; },
+    getSeverity:function(){return{key:"pending",label:"Передано лікарю",cls:""};}
   }
 };
 
@@ -662,6 +738,11 @@ async function init() {
 
 function startTest() { state.current=0; renderQuestion(); show('screen-test'); }
 
+function optsFor(test, i) {
+  var q = test.qoptions && test.qoptions[i];
+  return q ? q : {options: test.options, values: test.values};
+}
+
 function renderQuestion() {
   var test  = TESTS[state.sessionData.test_type];
   var total = test.questions.length, i = state.current;
@@ -676,27 +757,47 @@ function renderQuestion() {
   btnNext.disabled    = (state.answers[i]===null);
   var list = document.getElementById('optionsList');
   list.innerHTML = '';
-  test.options.forEach(function(label,idx){
+  var o = optsFor(test, i);
+  o.options.forEach(function(label,idx){
     var btn = document.createElement('button');
-    btn.className = 'option-btn'+(state.answers[i]===test.values[idx]?' selected':'');
+    btn.className = 'option-btn'+(state.answers[i]===o.values[idx]?' selected':'');
     btn.innerHTML = '<div class="option-circle"></div><span>'+label+'</span>';
     btn.onclick   = function(){ selectOption(idx); };
     list.appendChild(btn);
   });
 }
 
+function applySkips() {
+  var test = TESTS[state.sessionData.test_type];
+  if (!test.skip) return;
+  state.auto = state.auto || {};
+  for (var j = 0; j < test.questions.length; j++) {
+    if (test.skip(state.answers, j, state.sessionData)) { state.answers[j] = 0; state.auto[j] = true; }
+    else if (state.auto[j]) { state.answers[j] = null; state.auto[j] = false; }
+  }
+}
+
 function selectOption(idx) {
-  state.answers[state.current] = TESTS[state.sessionData.test_type].values[idx];
+  state.answers[state.current] = optsFor(TESTS[state.sessionData.test_type], state.current).values[idx];
+  applySkips();
   renderQuestion();
   if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
 }
 
-function prevQuestion() { if(state.current>0){ state.current--; renderQuestion(); } }
+function prevQuestion() {
+  var test = TESTS[state.sessionData.test_type];
+  var j = state.current - 1;
+  while (test.skip && j > 0 && test.skip(state.answers, j, state.sessionData)) j--;
+  if (j >= 0) { state.current = j; renderQuestion(); }
+}
 
 function nextQuestion() {
   var total = TESTS[state.sessionData.test_type].questions.length;
   if(state.answers[state.current]===null) return;
-  if(state.current<total-1){ state.current++; renderQuestion(); }
+  var test = TESTS[state.sessionData.test_type];
+  var j = state.current + 1;
+  while (test.skip && j < total && test.skip(state.answers, j, state.sessionData)) j++;
+  if (j < total) { state.current = j; renderQuestion(); }
   else { showResult(); }
 }
 
@@ -717,12 +818,19 @@ function showResult() {
 }
 
 // Кризовий екран: PHQ-9, пункт 9 > 0. Список контактів редагується тут.
-var CRISIS_CONTACTS = ['Екстрена допомога: 112', 'Швидка допомога: 103'];
+var CRISIS_CONTACTS = ["Екстрена допомога: 112", "Швидка допомога: 103", "Для ветеранів і військових та їхніх родин (цілодобово): 0 800 33 20 29"];
 var crisisShown = false;
+
+function crisisNeeded() {
+  var t = state.sessionData && state.sessionData.test_type;
+  if (t === 'phq9') return state.answers[8] > 0;
+  if (t === 'c_ssrs') return state.answers.some(function(a){ return a > 0; });
+  return false;
+}
 
 function showCrisisIfNeeded() {
   var t = state.sessionData && state.sessionData.test_type;
-  if (t !== 'phq9' || !(state.answers[8] > 0) || crisisShown) return;
+  if (!crisisNeeded() || crisisShown) return;
   crisisShown = true;
   var o = document.createElement('div');
   o.id = 'crisisOverlay';
