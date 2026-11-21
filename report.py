@@ -215,6 +215,9 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
             story += [Paragraph(_xe('Суїцидальний ризик: ' + severity_ua(test_type, result_data.get('severity'), result_data.get('score'))),
                                 ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
                       Spacer(1, 0.5*cm)]
+            _ys = [str(r_[0]) for r_ in item_rows(test_type, result_data, d) if r_[3] == 'Так']
+            story += [Paragraph(_xe('Пункти з відповіддю «Так»: ' + (', '.join(_ys) if _ys else 'немає')), norm),
+                      Spacer(1, 0.3*cm)]
             text = ('Скринінг не є діагнозом. Оцінку суїцидального ризику та подальші дії визначає фахівець. '
                     'Пункти 3–5 ставляться лише за відповіді «Так» на пункт 2.')
         if test_type == 'express':
@@ -455,7 +458,7 @@ def _items_story(test_type, rows, head, norm) -> list:
         hdr.append(Paragraph('Бал', bold))
     data, alert_rows = [hdr], []
     for i, q, a, label in rows:
-        flag = test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0
+        flag = (test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0) or (test_type == 'c_ssrs' and i in (3, 4, 5, 6) and label == 'Так')
         stl = red if flag else cell
         row = [Paragraph(str(i), stl), Paragraph(_xe(q), stl), Paragraph(_xe(label), stl)]
         if scored:
