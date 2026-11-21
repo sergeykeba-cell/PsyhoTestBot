@@ -219,8 +219,9 @@ def generate_pdf_report(result_data: dict) -> BytesIO:
                     'Пункти 3–5 ставляться лише за відповіді «Так» на пункт 2.')
         if test_type == 'express':
             _sc = (d or {}).get('scales') or []
-            if (d or {}).get('item9_positive'):
-                story += [Paragraph(_xe('Увага: позитивна відповідь на пункт 9 PHQ-9 — потрібна пріоритетна оцінка суїцидального ризику.'),
+            _i9, _al = item9_alert({**result_data, 'test_type': test_type}, d)
+            if _al:
+                story += [Paragraph(_xe(_al),
                                     ParagraphStyle('A', parent=norm, fontName='DejaVu-Bold', textColor=colors.HexColor('#b91c1c'))),
                           Spacer(1, 0.5*cm)]
             if _sc:
@@ -301,7 +302,7 @@ def item_lines(test_type, src: dict, d: dict = None) -> list:
             return []
         if not 0 <= a <= 3:
             return []
-        flag = ' ⚠️' if (test_type == 'phq9' and i == 9 and a > 0) else ''
+        flag = ' ⚠️' if (test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0) else ''
         out.append(f"{i}. {q} — {a} ({_FREQ_UA[a]}){flag}")
     return out
 
@@ -343,7 +344,7 @@ def _items_story(test_type, rows, head, norm) -> list:
              Paragraph('Відповідь', bold), Paragraph('Бал', bold)]]
     alert_rows = []
     for i, q, a in rows:
-        flag = test_type == 'phq9' and i == 9 and a > 0
+        flag = test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0
         stl = red if flag else cell
         data.append([Paragraph(str(i), stl), Paragraph(_xe(q), stl),
                      Paragraph(_xe(_FREQ_UA[a]), stl), Paragraph(str(a), stl)])
@@ -437,7 +438,7 @@ def item_lines(test_type, src: dict, d: dict = None) -> list:
     scored = _is_scored(test_type)
     out = []
     for i, q, a, label in item_rows(test_type, src, d):
-        flag = ' ⚠️' if (test_type == 'phq9' and i == 9 and a > 0) else ''
+        flag = ' ⚠️' if (test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0) else ''
         out.append(f"{i}. {q} — {f'{a} ({label})' if scored else label}{flag}")
     return out
 
@@ -454,7 +455,7 @@ def _items_story(test_type, rows, head, norm) -> list:
         hdr.append(Paragraph('Бал', bold))
     data, alert_rows = [hdr], []
     for i, q, a, label in rows:
-        flag = test_type == 'phq9' and i == 9 and a > 0
+        flag = test_type in ('phq9', 'express') and i == 9 and isinstance(a, int) and a > 0
         stl = red if flag else cell
         row = [Paragraph(str(i), stl), Paragraph(_xe(q), stl), Paragraph(_xe(label), stl)]
         if scored:
@@ -557,6 +558,10 @@ def item_rows(test_type, src, d=None):
     for i, (q, a) in enumerate(zip(qs, ans)):
         o = qo[i]
         try:
+            a = int(a)
+        except (TypeError, ValueError):
+            pass
+        try:
             label = o['options'][o['values'].index(a)]
         except (ValueError, IndexError):
             label = str(a)
@@ -612,16 +617,22 @@ def _is_scored(test_type) -> bool:
 _orig_item9_alert = item9_alert
 
 
+_I9_EXPRESS = 'Позитивна відповідь на пункт 9 PHQ-9 (комплексний скринінг): потрібна пріоритетна оцінка суїцидального ризику.'
+
+
 def item9_alert(res, d=None):
     if (res or {}).get('test_type') == 'express':
         dd = d if isinstance(d, dict) else {}
         pos = res.get('item9_positive')
         if pos is None:
             pos = dd.get('item9_positive')
-        if pos is None:
-            ans = _qopt_answers(res, dd)
-            pos = isinstance(ans, list) and len(ans) > 8 and ans[8] > 0
-        if pos:
-            return ('yes', 'Позитивна відповідь на пункт 9 PHQ-9 (комплексний скринінг): потрібна пріоритетна оцінка суїцидального ризику.')
-        return (None, None)
+        if pos is not None:
+            return ('yes', _I9_EXPRESS) if str(pos).lower() in ('true', '1') else ('no', '')
+        ans = _qopt_answers(res, dd)
+        if isinstance(ans, list) and len(ans) > 8:
+            try:
+                return ('yes', _I9_EXPRESS) if int(ans[8]) > 0 else ('no', '')
+            except (TypeError, ValueError):
+                pass
+        return 'unknown', _I9_UNK
     return _orig_item9_alert(res, d)
