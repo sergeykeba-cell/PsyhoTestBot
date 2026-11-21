@@ -935,6 +935,8 @@ function fillDoneSummary() {
 }
 
 async function sendResults() {
+  if (state.sending) return;
+  state.sending = true;
   show('screen-sending');
   var payload = {
     submission_id: crypto.randomUUID(),
@@ -953,13 +955,23 @@ async function sendResults() {
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
     });
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    if(!resp.ok) {
+      if (resp.status === 409) {
+        // токен уже использован: возможно, первый запрос дошёл, а ответ потерялся — проверяем статус сессии
+        try {
+          var chk = await loadSession(state.sessionToken);
+          if (chk && chk.status === 'completed') { state.sending = false; show('screen-done'); fillDoneSummary(); return; }
+        } catch (e2) { console.error(e2); }
+      }
+      throw new Error('HTTP '+resp.status);
+    }
     if(tg&&tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     show('screen-done');
     fillDoneSummary();
   } catch(err) {
     console.error(err);
     show('screen-result');
+    state.sending = false;
     alert('Не вдалося надіслати. Спробуйте ще раз.');
   }
 }
