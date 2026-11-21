@@ -447,7 +447,7 @@ def _items_story(test_type, rows, head, norm) -> list:
     if not rows:
         return []
     scored = _is_scored(test_type)
-    cell = ParagraphStyle('IC', parent=norm, fontSize=9.5, leading=12)
+    cell = ParagraphStyle('IC', parent=norm, fontSize=9, leading=11)
     bold = ParagraphStyle('IB', parent=cell, fontName='DejaVu-Bold')
     red = ParagraphStyle('IR', parent=bold, textColor=colors.HexColor('#b91c1c'))
     hdr = [Paragraph('№', bold), Paragraph('Питання', bold), Paragraph('Відповідь', bold)]
@@ -474,11 +474,13 @@ def _items_story(test_type, rows, head, norm) -> list:
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f4f4f5')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ]
     if scored:
         style.append(('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f4f4f5')))
+    if scored and len(data) > 2:
+        style.append(('NOSPLIT', (0, len(data) - 2), (-1, len(data) - 1)))
     for r in alert_rows:
         style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#fee2e2')))
     t.setStyle(TableStyle(style))
