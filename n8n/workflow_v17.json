@@ -707,10 +707,6 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "staticData": null,
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
   "nodeGroups": [],
   "pinData": {},
   "versionId": "56a15387-638b-4b86-873a-59726046a1c1",
@@ -718,29 +714,5 @@
   "versionCounter": 91,
   "triggerCount": 2,
   "sourceWorkflowId": null,
-  "tags": [],
-  "shared": [
-    {
-      "updatedAt": "2026-11-09T13:31:33.932Z",
-      "createdAt": "2026-11-09T13:31:33.932Z",
-      "role": "workflow:owner",
-      "workflowId": "miYBhLXbVInLPzqo",
-      "projectId": "OqlTm2gtAP3L0g1h",
-      "project": {
-        "updatedAt": "2026-11-09T13:29:12.137Z",
-        "createdAt": "2026-11-09T13:26:02.082Z",
-        "id": "OqlTm2gtAP3L0g1h",
-        "name": "Segiey Keba <sergeykeba@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "customTelemetryTags": [],
-        "creatorId": "10f8680c-519b-4d69-9e6e-4d5c85c9a013"
-      }
-    }
-  ],
-  "versionMetadata": {
-    "name": "Version 56a15387",
-    "description": ""
-  }
+  "tags": []
 }
